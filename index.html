@@ -1,0 +1,1004 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SF Neighborhoods — Interactive Reprioritizer</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a;
+    --text:#e7e9ee; --muted:#9aa3b2; --accent:#5b8cff; --good:#3ecf8e;
+    --warn:#f5a623; --bad:#ff6b6b; --chip:#262b36;
+    --w:#7aa2ff; --c:#62d5c0; --s:#9d8bff; --v:#ffc46b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  header{padding:20px 22px 8px;}
+  h1{font-size:20px;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:13px;max-width:780px}
+  .wrap{padding:14px 22px 60px}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:14px 0}
+  button{background:var(--panel2);color:var(--text);border:1px solid var(--line);
+    border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer}
+  button:hover{border-color:var(--accent)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:16px}
+  .weights{display:flex;flex-wrap:wrap;gap:18px}
+  .wctrl{min-width:170px;flex:1}
+  .wctrl label{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:4px}
+  .wctrl .v{color:var(--text);font-weight:600}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin-top:4px}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle}
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  th,td{border-bottom:1px solid var(--line);padding:8px 9px;text-align:left;vertical-align:top}
+  th{position:sticky;top:0;background:var(--panel2);z-index:2;font-size:11px;text-transform:uppercase;
+    letter-spacing:.4px;color:var(--muted);cursor:pointer;white-space:nowrap}
+  th.nosort{cursor:default}
+  tr.row:hover{background:#141821}
+  td.rank{font-weight:700;text-align:center;width:34px;color:var(--muted)}
+  .nb{font-weight:600}
+  td.vibe,td.notables{max-width:190px;font-size:12px;color:var(--muted)}
+  .editable{outline:none;border-radius:4px;padding:1px 3px;margin:-1px -3px}
+  .editable:focus{background:#23304d;box-shadow:0 0 0 1px var(--accent)}
+  .rent .corr{color:var(--warn);font-size:11px;display:block}
+  .fit-yes{color:var(--good);font-weight:600}
+  .fit-edge{color:var(--warn);font-weight:600}
+  .fit-no{color:var(--bad);font-weight:600}
+  .drag{cursor:grab;color:var(--muted);user-select:none;padding-right:2px}
+  tr.dragging{opacity:.4}
+  tr.over td{border-top:2px solid var(--accent)}
+  .ratings{display:flex;gap:4px}
+  .rcell{width:30px;text-align:center;border:1px solid var(--line);border-radius:6px;background:var(--panel2);
+    color:var(--text);font-size:12px;padding:3px 0;cursor:pointer;position:relative}
+  .rcell.w{box-shadow:inset 0 -3px 0 var(--w)} .rcell.c{box-shadow:inset 0 -3px 0 var(--c)}
+  .rcell.s{box-shadow:inset 0 -3px 0 var(--s)} .rcell.v{box-shadow:inset 0 -3px 0 var(--v)}
+  .score{font-weight:700;font-size:15px;text-align:right;min-width:46px}
+  .scorebar{height:5px;border-radius:3px;background:linear-gradient(90deg,var(--accent),var(--good));margin-top:3px}
+  .delcol button{padding:3px 7px;font-size:12px;color:var(--muted);border-color:transparent;background:transparent}
+  .delcol button:hover{color:var(--bad)}
+  .note{color:var(--muted);font-size:12px;max-width:240px}
+  td.safety,td.parks,td.commute{max-width:170px;font-size:12px}
+  .hint{color:var(--muted);font-size:12px;margin-top:8px}
+  .corrflag{color:var(--warn)}
+  .scroll{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+  @media(max-width:900px){ .note,td.safety,td.parks,td.vibe,td.notables,td.commute{max-width:130px} }
+  /* photos */
+  .incar{width:260px}
+  .incstage{position:relative;width:260px;height:156px;border-radius:10px;overflow:hidden;background:#0b0d12;display:flex;align-items:center;justify-content:center;border:1px solid var(--line)}
+  .incimg{width:260px;height:156px;object-fit:cover;display:block}
+  .incph{width:260px;height:156px;display:flex;align-items:center;justify-content:center;text-align:center;padding:10px;background:linear-gradient(135deg,#222a3a,#2c3550);color:#cdd6e6;font-size:12px;line-height:1.4}
+  .incnav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:16px;cursor:pointer;z-index:2;display:flex;align-items:center;justify-content:center}
+  .incnav.prev{left:6px} .incnav.next{right:6px}
+  .incnav:hover{background:var(--accent)}
+  .inccap{font-size:11px;color:var(--muted);padding:5px 2px 2px;white-space:normal;line-height:1.3}
+  .incdots{display:flex;gap:4px;justify-content:center;padding-bottom:2px}
+  .incdots span{width:6px;height:6px;border-radius:50%;background:var(--line)}
+  .incdots span.on{background:var(--accent)}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.82);display:none;align-items:center;justify-content:center;z-index:50}
+  .modal.open{display:flex}
+  .lb{background:var(--panel);border:1px solid var(--line);border-radius:14px;width:min(760px,92vw);padding:14px 16px 16px}
+  .lb h3{margin:2px 0 10px;font-size:16px}
+  .lb .stage{position:relative;background:#0b0d12;border-radius:10px;overflow:hidden;aspect-ratio:5/3;display:flex;align-items:center;justify-content:center}
+  .lb .stage .media{width:100%;height:100%;object-fit:cover;display:block}
+  .lb .stage .ph{color:var(--muted);text-align:center;padding:24px;font-size:15px;line-height:1.5}
+  .lb .cap{margin-top:10px;color:var(--text);font-size:13px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .lb .nav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:40px;height:40px;font-size:20px;cursor:pointer;z-index:2}
+  .lb .nav.prev{left:8px} .lb .nav.next{right:8px}
+  .lb .dots{display:flex;gap:6px;justify-content:center;margin-top:10px}
+  .lb .dots span{width:8px;height:8px;border-radius:50%;background:var(--line);cursor:pointer}
+  .lb .dots span.on{background:var(--accent)}
+  .lb .close{float:right;background:transparent;border:none;color:var(--muted);font-size:18px;cursor:pointer}
+  .lb a.sv{color:var(--accent);font-size:12px;text-decoration:none;white-space:nowrap}
+  .keyrow{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+  .keyrow input{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:6px 10px;font-size:12px;min-width:300px}
+  .psfpill{display:inline-block;padding:2px 7px;border-radius:6px;color:#0b0d12;font-weight:700;font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .psflegend{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:12px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 14px;margin:0 0 14px}
+  .psflegend-title{font-weight:600;color:var(--text)}
+  .psfkey{display:flex;align-items:center;gap:6px;color:var(--text);font-weight:600}
+  .psfsw{width:20px;height:13px;border-radius:3px;display:inline-block;flex:none}
+  .psflegend-note{color:var(--muted);font-style:italic;font-weight:400}
+  .psflegend-rng{color:var(--muted);font-weight:400;font-variant-numeric:tabular-nums}
+  td.rentcol{min-width:250px}
+  .rrow{display:flex;align-items:center;gap:9px;padding:5px 0}
+  .rrow+.rrow{border-top:1px solid var(--line)}
+  .brtag{font-size:10px;font-weight:700;color:var(--muted);background:var(--chip);border-radius:5px;padding:2px 6px;min-width:32px;text-align:center;flex:none}
+  .rrow .rtxt{flex:1;font-size:12px;color:var(--text)}
+  /* tabs + map */
+  .tabs{display:flex;gap:6px;margin:4px 0 14px}
+  .tab{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 16px;font-size:13px;cursor:pointer;color:var(--muted)}
+  .tab.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  .mapbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+  .metricbtn{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 11px;font-size:12px;cursor:pointer;color:var(--text)}
+  .metricbtn.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  #map{height:calc(100vh - 170px);min-height:560px;width:100%;border:1px solid var(--line);border-radius:12px}
+  .mpop{font-size:12px;line-height:1.45;color:#111}
+  .mpop-h{font-weight:700;font-size:13px;margin-bottom:2px}
+  .mpop-vibe{color:#555;margin-bottom:5px}
+  .mpop-rent{margin-bottom:5px}
+  .mpop-row{margin-bottom:3px}
+  .mpop-score{margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+  .pchip{font-size:10px;font-weight:700;border-radius:5px;padding:1px 5px;color:#0b0d12}
+  .pchip-w{background:#7aa2ff} .pchip-c{background:#62d5c0} .pchip-s{background:#9d8bff} .pchip-v{background:#ffc46b}
+  .leaflet-popup-content{margin:10px 12px}
+  .leaflet-popup-content a.sv{color:#1a56db}
+  .mtip{font-size:11px;line-height:1.7;color:#111;text-align:center}
+  .mtip .tw,.mtip .tc,.mtip .ts,.mtip .tv{display:inline-block;font-weight:700;border-radius:4px;padding:1px 5px;color:#0b0d12}
+  .mtip .tw{background:#7aa2ff} .mtip .tc{background:#62d5c0} .mtip .ts{background:#9d8bff} .mtip .tv{background:#ffc46b}
+  /* listings */
+  .listtog{cursor:pointer;text-align:center;white-space:nowrap;color:var(--accent);font-weight:600;font-size:12px;min-width:60px}
+  .listtog:hover{text-decoration:underline}
+  tr.listrow td{background:#10131a;padding:0 0 6px}
+  .lpanel{padding:8px 14px 12px}
+  .lpanel-h{font-weight:600;font-size:13px;margin:6px 0 8px;color:var(--text)}
+  table.ltbl{width:auto;min-width:640px;font-size:12px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  table.ltbl th{position:static;background:var(--panel2);border-bottom:1px solid var(--line);text-transform:none;letter-spacing:0;font-size:11px;cursor:default;padding:6px 10px;white-space:nowrap}
+  table.ltbl td{padding:6px 10px;vertical-align:middle;border-bottom:1px solid var(--line)}
+  .lthumb{width:96px;height:64px;object-fit:cover;border-radius:7px;display:block;border:1px solid var(--line)}
+  .lthumb.ph{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#222a3a,#2c3550);color:var(--muted);font-size:11px;text-align:center}
+  .lphoto{width:110px}
+  .laddr{font-size:11px;color:var(--muted);margin-top:4px;max-width:130px;line-height:1.3}
+  .lprice{font-weight:600;color:var(--good);white-space:nowrap}
+  .lpsf{color:var(--muted);white-space:nowrap}
+  .lrate{display:inline-block;min-width:22px;text-align:center;border-radius:6px;color:#0b0d12;font-weight:700;padding:2px 7px}
+  .lrate-max{color:var(--muted);font-size:10px;margin-left:2px}
+  .lempty{color:var(--muted);font-style:italic;padding:12px}
+  .ldel{padding:2px 7px;font-size:12px;color:var(--muted);border-color:transparent;background:transparent}
+  .ldel:hover{color:var(--bad)}
+  .addlist{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
+  .addlist input{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:7px;padding:6px 9px;font-size:12px}
+  .addlist input.sm{width:64px}
+  .laddbtn{background:var(--accent);border-color:var(--accent);color:#fff}
+  .leaflet-tooltip.routelbl{background:rgba(15,17,21,.9);border:none;color:#fff;font-weight:700;font-size:11px;padding:2px 7px;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+  .leaflet-tooltip.routelbl:before{display:none}
+  .mpop-commute{margin-top:8px;border-top:1px solid #ddd;padding-top:7px;font-size:12px}
+  .cbtns{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
+  .cbtn{font-size:11px;border:1px solid #ccc;background:#f4f4f6;color:#111;border-radius:6px;padding:3px 7px;cursor:pointer;display:flex;align-items:center;gap:5px}
+  .cbtn:hover{border-color:#1a56db}
+  .cdot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
+  .mpop-transit{margin-top:6px;font-size:11px;line-height:1.45}
+  .mtip{max-width:360px}
+  .tcommute{margin-top:6px;border-top:1px solid #ddd;padding-top:5px;text-align:left}
+  .tch{font-weight:700;font-size:11px;margin-bottom:3px}
+  .tcchips{display:flex;flex-wrap:wrap;gap:4px}
+  .tcm{font-size:10px;background:#f0f0f3;border:1px solid #ddd;border-radius:5px;padding:1px 5px;display:inline-flex;align-items:center;gap:4px;color:#111}
+  .tcsum{margin-top:5px;font-size:10px;color:#444;line-height:1.4}
+</style>
+</head>
+<body>
+<header>
+  <h1>SF Neighborhoods — Interactive Reprioritizer</h1>
+  <div class="sub">Office: SoMa/FiDi · Budget ~$5K, ideally 2BR (open to 1BR). Data verified mid-2026 (Zumper / Apartments.com / RentCafe + crime &amp; parks sources). Drag the ⠿ handle to reprioritize, click any cell to edit, adjust the priority sliders to re-score, or click a column header to sort. Edits auto-save in this browser.</div>
+</header>
+
+<div class="wrap">
+  <div class="tabs">
+    <button id="tabTable" class="tab active">▦ Table</button>
+    <button id="tabMap" class="tab">🗺 Map</button>
+  </div>
+
+  <div id="tableView">
+  <div class="psflegend" id="psflegend">
+    <span class="psflegend-title">$/sqft value</span>
+  </div>
+  <div class="toolbar">
+    <button class="primary" id="sortScore">↓ Sort by weighted score</button>
+    <button id="restoreOrder">Restore your draft order</button>
+    <button id="addRow">+ Add neighborhood</button>
+    <button id="exportJson">Export JSON</button>
+    <button id="exportCsv">Export CSV</button>
+    <button id="copySummary">Copy summary for chat</button>
+    <button id="importListings">Import listings JSON</button>
+    <input type="file" id="lfile" accept="application/json,.json" style="display:none">
+    <button id="reset" style="margin-left:auto">Reset all to verified defaults</button>
+  </div>
+
+  <div class="scroll">
+  <table id="tbl">
+    <thead><tr>
+      <th class="nosort"></th>
+      <th class="nosort">#</th>
+      <th data-k="name">Neighborhood</th>
+      <th class="nosort">Photos</th>
+      <th data-k="vibe">Vibe</th>
+      <th data-k="notables">Notables</th>
+      <th data-k="commute">Commute to SoMa/FiDi</th>
+      <th class="nosort">Rent · size · <span style="color:var(--good)">$</span>/sqft</th>
+      <th data-k="safety">Safety / clean</th>
+      <th data-k="parks">Parks / nature</th>
+      <th class="nosort">Ratings W·C·S·V</th>
+      <th data-k="score">Score</th>
+      <th class="nosort">🏠 Listings</th>
+      <th class="nosort">Notes</th>
+      <th class="nosort"></th>
+    </tr></thead>
+    <tbody id="body"></tbody>
+  </table>
+  </div>
+  <div class="hint">Tip: “Score” weights your 1–5 ratings by the sliders above. Drag rows to set your own order manually — the # column renumbers automatically. Use “Copy summary for chat” to paste your updated list back to me and we’ll keep iterating.</div>
+  </div><!-- /tableView -->
+
+  <div id="mapView" style="display:none">
+    <div class="mapbar">
+      <span class="sub">Marker color by:</span>
+      <button class="metricbtn active" data-metric="score">Weighted score</button>
+      <button class="metricbtn" data-metric="psf">2BR $/sqft value</button>
+      <button class="metricbtn" data-metric="commute">Commute</button>
+      <span class="sub" style="margin-left:8px">Bubble size = 2BR value (bigger = better $/sqft). 📍 = 201 Spear St. Hover a bubble to draw its best commute route; click for all modes — transit shows real BART/Muni lines (walk/transit/bike/drive).</span>
+    </div>
+    <div id="map"></div>
+  </div>
+
+  <div class="panel" style="margin-top:18px">
+    <div style="font-weight:600;margin-bottom:10px">Priority weights — drag to reflect what matters most, then “Sort by score”</div>
+    <div class="weights">
+      <div class="wctrl"><label>Walkable / city feel <span class="v" id="lw">7</span></label><input type="range" id="ww" min="0" max="10" value="7"></div>
+      <div class="wctrl"><label>Commute &lt;30m to SoMa/FiDi <span class="v" id="lc">7</span></label><input type="range" id="wc" min="0" max="10" value="7"></div>
+      <div class="wctrl"><label>Safe / clean + parks <span class="v" id="ls">7</span></label><input type="range" id="ws" min="0" max="10" value="7"></div>
+      <div class="wctrl"><label>Value for space <span class="v" id="lv">7</span></label><input type="range" id="wv" min="0" max="10" value="7"></div>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--w)"></span>Walk rating</span>
+      <span><span class="dot" style="background:var(--c)"></span>Commute rating</span>
+      <span><span class="dot" style="background:var(--s)"></span>Safety/Parks rating</span>
+      <span><span class="dot" style="background:var(--v)"></span>Value rating</span>
+      <span>(ratings 1–5; click a rating cell to cycle it)</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div style="font-weight:600;margin-bottom:6px">Neighborhood photos</div>
+    <div class="sub">Each row's <b>Photos</b> button opens a carousel of 4–6 representative spots (popular places + a residential street). By default each opens in Google Street View when clicked. To embed the photos inline, paste a free Google <b>Street View Static API</b> key below (stored only in this browser).</div>
+    <div class="keyrow">
+      <input type="password" id="gkey" placeholder="Google Street View Static API key (optional)">
+      <button id="savekey">Save key</button>
+      <span id="keystat" class="sub"></span>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modal">
+  <div class="lb">
+    <button class="close" id="lbClose">✕</button>
+    <h3 id="lbTitle"></h3>
+    <div class="stage" id="lbStage">
+      <button class="nav prev" id="lbPrev">‹</button>
+      <button class="nav next" id="lbNext">›</button>
+    </div>
+    <div class="cap"><span id="lbCap"></span><a class="sv" id="lbLink" target="_blank" rel="noopener">Open in Google Maps / Street View ↗</a></div>
+    <div class="dots" id="lbDots"></div>
+  </div>
+</div>
+
+<script>
+const DEFAULTS = [
+ {name:"North Beach / Telegraph Hill", vibe:"charming, and close to FiDi",
+  notables:"Italian restaurants, cafés, nightlife, Washington Square",
+  oneBR:"$3.6–4.3K / 600–750", twoBR:"$5.2–6.2K / 850–1,100", twoBRcorr:"was $4.6–5.3K — too low",
+  commute:"Walk/bus 15–25m to FiDi", safety:"Above-avg property crime (car break-ins); no open-air drug issue",
+  parks:"Strong: Washington Sq, Coit Tower steps", fit:"edge",
+  r:{w:5,c:4,s:4,v:3}, note:"2BR now pricier than your draft; great character + parks."},
+
+ {name:"Mission Bay", vibe:"Clean, new, convenient, very close to work",
+  notables:"UCSF, Chase Center, waterfront, new apartments",
+  oneBR:"$4.8–5.3K / 700–800", twoBR:"$6.4–7K / 1,000–1,200", twoBRcorr:"was $5.7–6.3K — low",
+  commute:"T-line/bike 15–25m; flat", safety:"Safest/newest; minor 2025 theft uptick",
+  parks:"Modern waterfront: Mission Creek, China Basin", fit:"no",
+  r:{w:3,c:5,s:4,v:1}, note:"2BR well over $5K. Modern but low character."},
+
+ {name:"SoMa", vibe:"Best commute if office proximity matters more than neighborhood feel",
+  notables:"Tech offices, warehouses, nightlife pockets, Folsom/Howard",
+  oneBR:"$4.4–5.2K / 700–750", twoBR:"$5.3–6K / 850–1,050", twoBRcorr:"",
+  commute:"Walk, shortest of all", safety:"Block-dependent; west/6th St serious drugs + theft",
+  parks:"Limited: Yerba Buena, South Park", fit:"edge",
+  r:{w:4,c:5,s:2,v:2}, note:"East/Rincon Hill blocks far safer than west/6th St — vet the exact street."},
+
+ {name:"FiDi / Embarcadero", vibe:"Best possible FiDi commute with waterfront access",
+  notables:"Offices, waterfront, Salesforce Park",
+  oneBR:"~$4–4.6K / 650–800", twoBR:"$5.5–7K / 1,000–1,300", twoBRcorr:"1BR: market-rate ~$4–4.6K",
+  commute:"In-district walk; flat", safety:"Embarcadero fine; FiDi core dead off-hours, car break-ins",
+  parks:"Waterfront promenade; little true green", fit:"edge",
+  r:{w:4,c:5,s:3,v:2}, note:"Empties out nights/weekends. Embarcadero edge livelier."},
+
+ {name:"Potrero Hill", vibe:"Sunny, residential, close to east-side offices, more space than core downtown",
+  notables:"18th St, views, hills, parks, quieter residential blocks",
+  oneBR:"$4.1–4.4K / 650–800", twoBR:"$5.5–6.1K / 950–1,100", twoBRcorr:"verified 2BR range $4.8K–$10K",
+  commute:"15–35m bus/bike/walk; 22nd St Caltrain", safety:"Generally safe; NW corner softer; some car break-ins",
+  parks:"Strong & sunny: McKinley Sq, Potrero Rec, gardens", fit:"edge",
+  r:{w:4,c:4,s:4,v:3}, note:"Your read holds — nice lifestyle, 2BR over $5K. Hills + Caltrain access."},
+
+ {name:"South Beach / China Basin", vibe:"Very convenient if you want waterfront, Caltrain/Oracle Park access, and short office commute",
+  notables:"Oracle Park, waterfront, condos, Caltrain, Embarcadero edge",
+  oneBR:"$3.9–4.3K / 750–800", twoBR:"$5.3–5.8K / 1,000–1,200", twoBRcorr:"1BR slightly lower than draft",
+  commute:"Walk/bike 10–20m; flat", safety:"Good; cleaner than SoMa core",
+  parks:"Strong: new China Basin Park, Embarcadero", fit:"edge",
+  r:{w:4,c:5,s:4,v:2}, note:"Excellent commute; 2BR just above $5K at low end."},
+
+ {name:"Hayes Valley", vibe:"city energy, very walkable, gentrified, but could be close to less nice areas (Civic Center)",
+  notables:"Restaurants, boutiques, arts",
+  oneBR:"~$4K / 600–700", twoBR:"$4.5–6.6K / 900–1,100", twoBRcorr:"",
+  commute:"Best transit: Metro/BART 15–20m", safety:"Core safe & lively; eastern edge near Civic Center/TL rough",
+  parks:"Small: Patricia's Green (Panhandle short hop)", fit:"yes",
+  r:{w:5,c:5,s:3,v:3}, note:"Your Civic Center caveat is correct. 2BR fits at lower end."},
+
+ {name:"Design District / Showplace Square", vibe:"Close to SoMa/Mission Bay, good for startup/office access, less purely residential",
+  notables:"Showrooms, warehouses, CCA, AI/robotics offices, 16th/7th/Townsend area",
+  oneBR:"$4.2–4.8K / 650–800", twoBR:"$5.5–6.2K / 900–1,100", twoBRcorr:"",
+  commute:"5–20m walk/bike/bus to SoMa", safety:"Industrial/quiet; fewer eyes on street, some car/property theft",
+  parks:"Limited green; Jackson Playground nearby", fit:"edge",
+  r:{w:4,c:5,s:3,v:3}, note:"Convenient niche lifestyle (One Henry Adams). Walk Score 91; sparse at night."},
+
+ {name:"Japantown / Fillmore edge", vibe:"Central, walkable, distinctive, and close to multiple strong neighborhoods",
+  notables:"Japan Center, Fillmore, ramen, cafés, music history",
+  oneBR:"$3.5–4.2K / 500–700", twoBR:"$4.5–5.6K / 800–1,000", twoBRcorr:"",
+  commute:"38-Geary bus 20–25m", safety:"Core safe; Fillmore/W. Addition edges need caution",
+  parks:"Limited; Lafayette/Alta Plaza walkable", fit:"yes",
+  r:{w:4,c:4,s:3,v:4}, note:"Good value + culture; block-by-block safety variance."},
+
+ {name:"NOPA", vibe:"Great neighborhood density with parks, restaurants, and central access",
+  notables:"Divisadero, Alamo Square, Panhandle, restaurants",
+  oneBR:"~$4K / 550–750", twoBR:"$3.9–5.5K / 700–1,000", twoBRcorr:"",
+  commute:"Weak transit; great bike (the Wiggle)", safety:"Good, family-friendly; softer eastern edge",
+  parks:"BEST: Panhandle + Golden Gate Park, Alamo Sq", fit:"yes",
+  r:{w:4,c:3,s:5,v:4}, note:"You undersold the parks — best green of the list. Bike commute."},
+
+ {name:"Noe Valley", vibe:"Sunny, polished, walkable, calmer than Mission/Castro",
+  notables:"24th St, cafés, families, sunny village feel",
+  oneBR:"$3.7–5.1K / 500–700", twoBR:"$4.7–6.9K / 800–1,000", twoBRcorr:"",
+  commute:"Longest: J-Church 25–30m (unreliable)", safety:"Safest-feeling; not near any rough area",
+  parks:"Good + sunny: Douglass, Glen Canyon", fit:"edge",
+  r:{w:4,c:3,s:5,v:3}, note:"Don't expect <30m commute. Calm, low city-energy."},
+
+ {name:"Dogpatch", vibe:"newer housing, waterfront access, and east-side commute",
+  notables:"3rd St, waterfront, warehouse/design vibe",
+  oneBR:"~$3.8K / 650–800", twoBR:"$5–6.5K / 850–1,050", twoBRcorr:"",
+  commute:"T-line/bike 15–30m; flat", safety:"Moderate; traffic > crime, some car break-ins",
+  parks:"Strong: Crane Cove, Esprit, waterfront", fit:"edge",
+  r:{w:4,c:4,s:4,v:3}, note:"Cool & walkable; 2BR low end only at $5K."},
+
+ {name:"Pacific Heights", vibe:"Beautiful, polished, very walkable, classic SF feel",
+  notables:"Fillmore, Alta Plaza, mansions, polished classic SF",
+  oneBR:"$3.3–4K / 650–800", twoBR:"$4.5–6K / 900–1,050", twoBRcorr:"1BR lower than draft",
+  commute:"1-Cal/2-Sutter bus 20–35m; hilly", safety:"Among safest in SF",
+  parks:"Excellent: Lafayette, Alta Plaza, Presidio", fit:"yes",
+  r:{w:4,c:3,s:5,v:3}, note:"Not walkable to office daily (hills). 2BR fits at lower end."},
+
+ {name:"Lower Nob Hill / Polk Gulch", vibe:"Dense, walkable, cheaper than Russian/Nob Hill proper, but a little more urban vibes",
+  notables:"Polk St bars/restaurants, central access",
+  oneBR:"$2.8–4.1K / 450–650", twoBR:"$3.4–5.1K / 750–1,000", twoBRcorr:"",
+  commute:"Walkable 15–30m — better than rank implies", safety:"Borders Tenderloin; N of Geary fine, S gritty",
+  parks:"Limited: Huntington Park", fit:"yes",
+  r:{w:5,c:5,s:3,v:5}, note:"Best value + genuinely walkable. Which side of Geary matters a lot."},
+
+ {name:"Mission / Mission Dolores", vibe:"urban energy, food, nightlife, transit, and commute",
+  notables:"Valencia St, Dolores Park, restaurants, bars, sunny weather",
+  oneBR:"$3.4–4K / 550–750", twoBR:"$4–6K / 850–1,100", twoBRcorr:"",
+  commute:"BART = fastest, ~6–10m ride", safety:"16th St BART hotspot; Mission Dolores side quiet",
+  parks:"Dolores Park; sunniest in SF", fit:"yes",
+  r:{w:5,c:5,s:4,v:5}, note:"Best value + fastest commute via BART. Dolores side avoids the 16th St scene."},
+];
+
+const KEY="sf_neigh_v1";
+let data;
+try{ data = JSON.parse(localStorage.getItem(KEY)) || JSON.parse(JSON.stringify(DEFAULTS)); }
+catch(e){ data = JSON.parse(JSON.stringify(DEFAULTS)); }
+
+// Migration: add any DEFAULT neighborhood missing from saved data (at its default position),
+// and backfill any new fields (vibe / notables) onto rows saved by an older version.
+DEFAULTS.forEach((d,idx)=>{
+  const existing = data.find(x=>x.name===d.name);
+  if(!existing){ data.splice(Math.min(idx,data.length),0,JSON.parse(JSON.stringify(d))); }
+  else { if(existing.notables===undefined) existing.notables=d.notables;
+         if(existing.vibe===undefined) existing.vibe=d.vibe; }
+});
+// Ensure every district has a listings array (new feature).
+data.forEach(r=>{ if(!Array.isArray(r.listings)) r.listings=[]; });
+// Track which districts have their listings panel expanded (persists across re-renders).
+const openListings = new Set();
+
+// ---- Seeded listings: baked into this file, merged once into your saved data ----
+// Each entry is applied a single time (tracked in localStorage), so it survives your
+// edits and won't come back if you later delete it.
+const SEED_LISTINGS = [
+ {id:"channel-mission-bay-438", neighborhood:"Mission Bay", source:"hotpads",
+  address:"Channel Mission Bay (Unit 438), San Francisco, CA 94158",
+  rent:4814, beds:1, baths:1, sqft:671, rating:null,
+  url:"https://hotpads.com/channel-mission-bay-san-francisco-ca-94158-skf95d/pad", img:""}
+];
+try{
+  const seeded=new Set(JSON.parse(localStorage.getItem("sf_seeded_v1")||"[]"));
+  SEED_LISTINGS.forEach(s=>{
+    const di=findDistrict(s.neighborhood);
+    if(di>=0){
+      const m=data[di].listings.find(e=>(s.url&&e.url===s.url)||(s.address&&e.address===s.address));
+      if(m){
+        // Existing match: backfill only blank fields, never overwrite your edits.
+        ["img","url"].forEach(k=>{ if(!m[k] && s[k]) m[k]=s[k]; });
+      } else if(!seeded.has(s.id)){
+        // Not present and never seeded before: add once (so deleting it later sticks).
+        data[di].listings.push({img:s.img||"",url:s.url||"",address:s.address||"",
+          beds:s.beds??null,baths:s.baths??null,rent:s.rent??null,sqft:s.sqft??null,rating:s.rating??null});
+        openListings.add(data[di].name);
+      }
+    }
+    seeded.add(s.id);
+  });
+  localStorage.setItem("sf_seeded_v1", JSON.stringify([...seeded]));
+}catch(e){}
+
+// ---- Representative spots per neighborhood (popular places + a residential street) ----
+const SPOTS = {
+ "North Beach / Telegraph Hill":[{c:"Washington Square Park",q:"Washington Square Park, North Beach San Francisco"},{c:"Coit Tower / Telegraph Hill",q:"Coit Tower, San Francisco"},{c:"Columbus Avenue",q:"Columbus Avenue, North Beach San Francisco"},{c:"Filbert Street Steps",q:"Filbert Steps, San Francisco"},{c:"Grant Avenue cafés",q:"Grant Avenue, North Beach San Francisco"}],
+ "Mission Bay":[{c:"Chase Center",q:"Chase Center, San Francisco"},{c:"Mission Creek Park",q:"Mission Creek Park, San Francisco"},{c:"Fourth Street",q:"Fourth Street, Mission Bay San Francisco"},{c:"UCSF Mission Bay",q:"UCSF Mission Bay Campus, San Francisco"},{c:"China Basin Park",q:"China Basin Park, San Francisco"}],
+ "SoMa":[{c:"Yerba Buena Gardens",q:"Yerba Buena Gardens, San Francisco"},{c:"Folsom Street",q:"Folsom Street, SoMa San Francisco"},{c:"South Park",q:"South Park, SoMa San Francisco"},{c:"Rincon Hill",q:"Rincon Hill, San Francisco"},{c:"Howard Street",q:"Howard Street, SoMa San Francisco"}],
+ "FiDi / Embarcadero":[{c:"Ferry Building",q:"Ferry Building, San Francisco"},{c:"Embarcadero waterfront",q:"The Embarcadero, San Francisco"},{c:"Montgomery Street",q:"Montgomery Street, Financial District San Francisco"},{c:"Jackson Square",q:"Jackson Square, San Francisco"},{c:"Sue Bierman Park",q:"Sue Bierman Park, San Francisco"}],
+ "Potrero Hill":[{c:"18th Street shops",q:"18th Street, Potrero Hill San Francisco"},{c:"McKinley Square Park",q:"McKinley Square, San Francisco"},{c:"Vermont Street",q:"Vermont Street, Potrero Hill San Francisco"},{c:"Potrero Hill Rec Center",q:"Potrero Hill Recreation Center, San Francisco"},{c:"Connecticut Street",q:"Connecticut Street, Potrero Hill San Francisco"}],
+ "South Beach / China Basin":[{c:"Oracle Park",q:"Oracle Park, San Francisco"},{c:"South Beach Marina",q:"South Beach Harbor, San Francisco"},{c:"The Embarcadero",q:"The Embarcadero at Brannan, San Francisco"},{c:"South Park",q:"South Park, San Francisco"},{c:"King Street",q:"King Street, San Francisco"}],
+ "Hayes Valley":[{c:"Patricia's Green",q:"Patricia's Green, Hayes Valley San Francisco"},{c:"Hayes Street",q:"Hayes Street, Hayes Valley San Francisco"},{c:"Octavia Boulevard",q:"Octavia Boulevard, San Francisco"},{c:"Linden Alley",q:"Linden Street, Hayes Valley San Francisco"},{c:"Fell Street homes",q:"Fell Street, Hayes Valley San Francisco"}],
+ "Design District / Showplace Square":[{c:"Henry Adams Street",q:"Henry Adams Street, San Francisco"},{c:"Showplace Square",q:"Showplace Square, San Francisco"},{c:"16th Street",q:"16th Street, Design District San Francisco"},{c:"Jackson Playground",q:"Jackson Playground, San Francisco"},{c:"Division Street",q:"Division Street, San Francisco"}],
+ "Japantown / Fillmore edge":[{c:"Japan Center",q:"Japan Center, San Francisco"},{c:"Peace Plaza",q:"Peace Plaza, Japantown San Francisco"},{c:"Fillmore Street",q:"Fillmore Street, San Francisco"},{c:"Post Street",q:"Post Street, Japantown San Francisco"},{c:"Buchanan Mall",q:"Buchanan Street Mall, San Francisco"}],
+ "NOPA":[{c:"Divisadero Street",q:"Divisadero Street, San Francisco"},{c:"Alamo Square Park",q:"Alamo Square, San Francisco"},{c:"The Panhandle",q:"The Panhandle, San Francisco"},{c:"McAllister Street",q:"McAllister Street, NOPA San Francisco"},{c:"Grove Street homes",q:"Grove Street, NOPA San Francisco"}],
+ "Noe Valley":[{c:"24th Street",q:"24th Street, Noe Valley San Francisco"},{c:"Church Street",q:"Church Street, Noe Valley San Francisco"},{c:"Douglass Park",q:"Douglass Playground, San Francisco"},{c:"Noe Valley Town Square",q:"Noe Valley Town Square, San Francisco"},{c:"Castro Street homes",q:"Castro Street, Noe Valley San Francisco"}],
+ "Dogpatch":[{c:"Third Street",q:"Third Street, Dogpatch San Francisco"},{c:"Crane Cove Park",q:"Crane Cove Park, San Francisco"},{c:"Esprit Park",q:"Esprit Park, San Francisco"},{c:"Minnesota Street",q:"Minnesota Street, Dogpatch San Francisco"},{c:"22nd Street",q:"22nd Street, Dogpatch San Francisco"}],
+ "Pacific Heights":[{c:"Fillmore Street",q:"Fillmore Street, Pacific Heights San Francisco"},{c:"Alta Plaza Park",q:"Alta Plaza Park, San Francisco"},{c:"Lafayette Park",q:"Lafayette Park, San Francisco"},{c:"Broadway mansions",q:"Broadway, Pacific Heights San Francisco"},{c:"Lyon Street Steps",q:"Lyon Street Steps, San Francisco"}],
+ "Lower Nob Hill / Polk Gulch":[{c:"Polk Street",q:"Polk Street, San Francisco"},{c:"Huntington Park",q:"Huntington Park, San Francisco"},{c:"Sutter Street",q:"Sutter Street, Lower Nob Hill San Francisco"},{c:"Larkin Street",q:"Larkin Street, Polk Gulch San Francisco"},{c:"Hyde Street",q:"Hyde Street, Nob Hill San Francisco"}],
+ "Mission / Mission Dolores":[{c:"Dolores Park",q:"Dolores Park, San Francisco"},{c:"Valencia Street",q:"Valencia Street, San Francisco"},{c:"Mission Dolores Basilica",q:"Mission Dolores, San Francisco"},{c:"24th Street",q:"24th Street, Mission District San Francisco"},{c:"Guerrero Street homes",q:"Guerrero Street, San Francisco"}]
+};
+// ---- Approx neighborhood centroids for the map ----
+const COORDS = {
+ "North Beach / Telegraph Hill":[37.8003,-122.4097],
+ "Mission Bay":[37.7706,-122.3893],
+ "SoMa":[37.7785,-122.4060],
+ "FiDi / Embarcadero":[37.7946,-122.3994],
+ "Potrero Hill":[37.7585,-122.4007],
+ "South Beach / China Basin":[37.7825,-122.3905],
+ "Hayes Valley":[37.7765,-122.4248],
+ "Design District / Showplace Square":[37.7688,-122.4035],
+ "Japantown / Fillmore edge":[37.7852,-122.4296],
+ "NOPA":[37.7748,-122.4395],
+ "Noe Valley":[37.7506,-122.4331],
+ "Dogpatch":[37.7607,-122.3897],
+ "Pacific Heights":[37.7925,-122.4350],
+ "Lower Nob Hill / Polk Gulch":[37.7898,-122.4185],
+ "Mission / Mission Dolores":[37.7599,-122.4253]
+};
+const OFFICE=[37.79123,-122.39197]; // 201 Spear St
+const ROUTES={"North Beach / Telegraph Hill":{"drive":{"min":5,"km":2.5,"pts":[[37.80038,-122.40972],[37.80031,-122.41029],[37.79554,-122.40333],[37.79098,-122.40241],[37.79132,-122.39952],[37.79123,-122.39197]]},"walk":{"min":30,"km":2.2,"pts":[[37.80038,-122.40972],[37.80034,-122.41007],[37.79717,-122.40551],[37.79717,-122.40525],[37.79697,-122.40521],[37.79568,-122.40329],[37.79547,-122.40322],[37.79557,-122.40238],[37.7951,-122.40227],[37.79477,-122.40141],[37.79396,-122.40123],[37.79408,-122.40026],[37.7914,-122.39971],[37.79143,-122.39946],[37.79124,-122.39917],[37.79123,-122.39197]]},"bike":{"min":12,"km":2.3,"pts":[[37.80038,-122.40972],[37.80044,-122.4092],[37.79967,-122.40908],[37.79945,-122.40878],[37.79932,-122.40881],[37.79554,-122.40333],[37.79098,-122.40241],[37.79132,-122.39952],[37.79123,-122.39197]]},"transit":{"min":18,"est":true}},"Mission Bay":{"drive":{"min":5,"km":2.8,"pts":[[37.7706,-122.38936],[37.77638,-122.39006],[37.77702,-122.39049],[37.78626,-122.40204],[37.78978,-122.39758],[37.79123,-122.39197]]},"walk":{"min":35,"km":2.7,"pts":[[37.7706,-122.3893],[37.77652,-122.38992],[37.7772,-122.39043],[37.77781,-122.39122],[37.77823,-122.39082],[37.77842,-122.391],[37.77963,-122.38951],[37.78547,-122.39681],[37.78556,-122.3969],[37.78569,-122.39673],[37.78644,-122.39767],[37.78807,-122.39564],[37.78924,-122.3971],[37.79123,-122.39197]]},"bike":{"min":10,"km":3.0,"pts":[[37.7706,-122.3893],[37.7765,-122.39002],[37.77727,-122.39069],[37.77833,-122.3875],[37.78117,-122.38777],[37.78156,-122.38806],[37.78744,-122.38757],[37.78905,-122.3879],[37.7912,-122.3892],[37.79255,-122.39077],[37.79062,-122.39341],[37.79185,-122.39495],[37.78978,-122.39758],[37.79123,-122.39197]]},"transit":{"min":14,"est":true}},"SoMa":{"drive":{"min":5,"km":2.1,"pts":[[37.77836,-122.40582],[37.78383,-122.39899],[37.78626,-122.40204],[37.78978,-122.39758],[37.79123,-122.39197]]},"walk":{"min":28,"km":2.1,"pts":[[37.77844,-122.40592],[37.78363,-122.39934],[37.78386,-122.39962],[37.78401,-122.39957],[37.7843,-122.3998],[37.78486,-122.40049],[37.78588,-122.39926],[37.78601,-122.39942],[37.78855,-122.39624],[37.78925,-122.3971],[37.79123,-122.39197]]},"bike":{"min":11,"km":2.2,"pts":[[37.77844,-122.40592],[37.77859,-122.40573],[37.77851,-122.40563],[37.78547,-122.39681],[37.78557,-122.39675],[37.78759,-122.39928],[37.79123,-122.39197]]},"transit":{"min":12,"est":true}},"FiDi / Embarcadero":{"drive":{"min":2,"km":1.1,"pts":[[37.79464,-122.39906],[37.7952,-122.39918],[37.79534,-122.39801],[37.79351,-122.39763],[37.79322,-122.39998],[37.79133,-122.39961],[37.79128,-122.39945],[37.79123,-122.39197]]},"walk":{"min":13,"km":0.9,"pts":[[37.79469,-122.39942],[37.79472,-122.3992],[37.79421,-122.39907],[37.79188,-122.39861],[37.79175,-122.39854],[37.79124,-122.39917],[37.79105,-122.39893],[37.79102,-122.39897],[37.7894,-122.39695],[37.79123,-122.39197]]},"bike":{"min":7,"km":1.1,"pts":[[37.79469,-122.39942],[37.79472,-122.3992],[37.79428,-122.3991],[37.79414,-122.40016],[37.79133,-122.39961],[37.79128,-122.39945],[37.79123,-122.39197]]},"transit":{"min":8,"est":true}},"Potrero Hill":{"drive":{"min":9,"km":5.2,"pts":[[37.75848,-122.40102],[37.76228,-122.40133],[37.76283,-122.39237],[37.76458,-122.39285],[37.76578,-122.39366],[37.7691,-122.39737],[37.77219,-122.39794],[37.77365,-122.39723],[37.77798,-122.39169],[37.78626,-122.40204],[37.78978,-122.39758],[37.79123,-122.39197]]},"walk":{"min":59,"km":4.4,"pts":[[37.75848,-122.40102],[37.77002,-122.40213],[37.77102,-122.40085],[37.77292,-122.40322],[37.77658,-122.39897],[37.77766,-122.40032],[37.77967,-122.39841],[37.78219,-122.40117],[37.78363,-122.39934],[37.78486,-122.40049],[37.78855,-122.39624],[37.79123,-122.39197]]},"bike":{"min":17,"km":4.7,"pts":[[37.75848,-122.40102],[37.76999,-122.40228],[37.77114,-122.40082],[37.77434,-122.4047],[37.78309,-122.39362],[37.78759,-122.39928],[37.79123,-122.39197]]},"transit":{"min":22,"est":true}},"South Beach / China Basin":{"drive":{"min":3,"km":1.5,"pts":[[37.78264,-122.39057],[37.78265,-122.39065],[37.78274,-122.39065],[37.78286,-122.3908],[37.78186,-122.39209],[37.78759,-122.39928],[37.78935,-122.39704],[37.79123,-122.39197]]},"walk":{"min":17,"km":1.3,"pts":[[37.78254,-122.39055],[37.78251,-122.3906],[37.7827,-122.39085],[37.78185,-122.39193],[37.78414,-122.39478],[37.78431,-122.39488],[37.78446,-122.3952],[37.78644,-122.39767],[37.78807,-122.39564],[37.78924,-122.3971],[37.79123,-122.39197]]},"bike":{"min":5,"km":1.6,"pts":[[37.78254,-122.39055],[37.78258,-122.3905],[37.78265,-122.39065],[37.78274,-122.39065],[37.78286,-122.3908],[37.78186,-122.39209],[37.78759,-122.39928],[37.78935,-122.39704],[37.79123,-122.39197]]},"transit":{"min":10,"est":true}},"Hayes Valley":{"drive":{"min":9,"km":6.0,"pts":[[37.77666,-122.42483],[37.77709,-122.42135],[37.77803,-122.42154],[37.77889,-122.41496],[37.77746,-122.41318],[37.78978,-122.39758],[37.79123,-122.39197]]},"walk":{"min":51,"km":3.8,"pts":[[37.77659,-122.42482],[37.77683,-122.42291],[37.77708,-122.42146],[37.77717,-122.42147],[37.77786,-122.41613],[37.7811,-122.41197],[37.78096,-122.41169],[37.78628,-122.40495],[37.78553,-122.40403],[37.78653,-122.40256],[37.78626,-122.40222],[37.7864,-122.40205],[37.78627,-122.40189],[37.78801,-122.39964],[37.78763,-122.39917],[37.79123,-122.39197]]},"bike":{"min":18,"km":3.9,"pts":[[37.77659,-122.42482],[37.77668,-122.42465],[37.77761,-122.42483],[37.77889,-122.41496],[37.77746,-122.41318],[37.78978,-122.39758],[37.79123,-122.39197]]},"transit":{"min":20,"est":true}},"Design District / Showplace Square":{"drive":{"min":6,"km":3.7,"pts":[[37.76862,-122.40348],[37.7686,-122.40392],[37.7697,-122.40401],[37.76999,-122.40377],[37.7713,-122.40545],[37.78186,-122.39209],[37.78759,-122.39928],[37.79123,-122.39197]]},"walk":{"min":44,"km":3.3,"pts":[[37.76874,-122.40352],[37.76963,-122.40386],[37.76995,-122.40359],[37.77021,-122.40391],[37.77182,-122.40187],[37.77292,-122.40322],[37.77483,-122.40107],[37.77658,-122.39897],[37.77782,-122.40032],[37.77967,-122.39839],[37.78057,-122.39945],[37.78219,-122.40117],[37.78363,-122.39934],[37.7843,-122.39979],[37.78486,-122.40049],[37.78855,-122.39624],[37.79123,-122.39197]]},"bike":{"min":13,"km":3.6,"pts":[[37.76874,-122.40352],[37.76867,-122.40393],[37.7698,-122.40398],[37.76984,-122.40378],[37.7701,-122.40378],[37.77183,-122.40168],[37.77434,-122.4047],[37.78309,-122.39362],[37.78759,-122.39928],[37.79123,-122.39197]]},"transit":{"min":20,"est":true}},"Japantown / Fillmore edge":{"drive":{"min":8,"km":4.5,"pts":[[37.78486,-122.42953],[37.78475,-122.43119],[37.78726,-122.43166],[37.79133,-122.39961],[37.79123,-122.39197]]},"walk":{"min":55,"km":4.1,"pts":[[37.78521,-122.4295],[37.78499,-122.42945],[37.78501,-122.42916],[37.78552,-122.42443],[37.78629,-122.42361],[37.7866,-122.42179],[37.78746,-122.42196],[37.78751,-122.42158],[37.78843,-122.42177],[37.78987,-122.41053],[37.79007,-122.40891],[37.78931,-122.40875],[37.78965,-122.40534],[37.79037,-122.40027],[37.79102,-122.39943],[37.78925,-122.3971],[37.79123,-122.39197]]},"bike":{"min":18,"km":3.8,"pts":[[37.78521,-122.4295],[37.78554,-122.42957],[37.7857,-122.42888],[37.78911,-122.40203],[37.78866,-122.40198],[37.78828,-122.40152],[37.79059,-122.39859],[37.79123,-122.39197]]},"transit":{"min":28,"est":true}},"NOPA":{"drive":{"min":11,"km":7.0,"pts":[[37.77479,-122.4395],[37.77605,-122.42957],[37.77678,-122.42957],[37.78726,-122.43166],[37.79133,-122.39961],[37.79123,-122.39197]]},"walk":{"min":68,"km":5.1,"pts":[[37.77479,-122.4395],[37.77508,-122.43796],[37.77708,-122.42146],[37.77717,-122.42147],[37.77785,-122.41617],[37.7811,-122.41197],[37.78096,-122.41169],[37.78628,-122.40495],[37.78553,-122.40403],[37.78653,-122.40256],[37.78627,-122.40189],[37.78801,-122.39964],[37.78763,-122.39917],[37.79123,-122.39197]]},"bike":{"min":23,"km":5.2,"pts":[[37.77479,-122.4395],[37.77647,-122.42629],[37.7774,-122.42647],[37.77889,-122.41496],[37.77746,-122.41318],[37.78978,-122.39758],[37.79123,-122.39197]]},"transit":{"min":30,"est":true}},"Noe Valley":{"drive":{"min":13,"km":8.1,"pts":[[37.75055,-122.4331],[37.75049,-122.43403],[37.76734,-122.43565],[37.76777,-122.42851],[37.76965,-122.42613],[37.77001,-122.42017],[37.76914,-122.40958],[37.76924,-122.4079],[37.78186,-122.39209],[37.78759,-122.39928],[37.79123,-122.39197]]},"walk":{"min":89,"km":6.7,"pts":[[37.75055,-122.4331],[37.75063,-122.43179],[37.76412,-122.433],[37.78628,-122.40495],[37.78553,-122.40403],[37.78653,-122.40256],[37.78627,-122.40189],[37.78801,-122.39964],[37.78763,-122.39917],[37.79123,-122.39197]]},"bike":{"min":30,"km":6.7,"pts":[[37.75055,-122.4331],[37.75063,-122.43179],[37.76413,-122.43309],[37.76965,-122.42613],[37.77,-122.41997],[37.77197,-122.41921],[37.77389,-122.41769],[37.78978,-122.39758],[37.79123,-122.39197]]},"transit":{"min":32,"est":true}},"Dogpatch":{"drive":{"min":7,"km":4.5,"pts":[[37.76071,-122.38953],[37.76299,-122.38973],[37.76283,-122.39237],[37.76519,-122.39321],[37.76878,-122.39715],[37.77019,-122.39773],[37.77219,-122.39794],[37.77333,-122.39751],[37.77798,-122.39169],[37.78626,-122.40204],[37.78978,-122.39758],[37.79123,-122.39197]]},"walk":{"min":51,"km":3.8,"pts":[[37.76071,-122.38953],[37.76171,-122.38961],[37.76176,-122.38885],[37.76313,-122.3889],[37.77645,-122.39018],[37.77781,-122.39122],[37.77823,-122.39082],[37.77842,-122.391],[37.77963,-122.38951],[37.78547,-122.39681],[37.78569,-122.39673],[37.78644,-122.39767],[37.78807,-122.39564],[37.79123,-122.39197]]},"bike":{"min":15,"km":4.3,"pts":[[37.76071,-122.38953],[37.7643,-122.38989],[37.76424,-122.39084],[37.76502,-122.39066],[37.77452,-122.39154],[37.7748,-122.39194],[37.77618,-122.39003],[37.77727,-122.39069],[37.77833,-122.3875],[37.78117,-122.38777],[37.78156,-122.38806],[37.78849,-122.38771],[37.7912,-122.3892],[37.79255,-122.39077],[37.79062,-122.39341],[37.79185,-122.39495],[37.78978,-122.39758],[37.79123,-122.39197]]},"transit":{"min":22,"est":true}},"Pacific Heights":{"drive":{"min":8,"km":4.7,"pts":[[37.79243,-122.43499],[37.79248,-122.43458],[37.79428,-122.43494],[37.79595,-122.42179],[37.79633,-122.41784],[37.79786,-122.40674],[37.79554,-122.40333],[37.79098,-122.40241],[37.79132,-122.39952],[37.79123,-122.39197]]},"walk":{"min":57,"km":4.3,"pts":[[37.79243,-122.43499],[37.79625,-122.40454],[37.79545,-122.40344],[37.79557,-122.40238],[37.7951,-122.40227],[37.79477,-122.40141],[37.79396,-122.40123],[37.79408,-122.40026],[37.7914,-122.39971],[37.79143,-122.39946],[37.79124,-122.39917],[37.79123,-122.39197]]},"bike":{"min":20,"km":4.4,"pts":[[37.79243,-122.43499],[37.79353,-122.42635],[37.79177,-122.426],[37.795,-122.40033],[37.79133,-122.39961],[37.79123,-122.39197]]},"transit":{"min":30,"est":true}},"Lower Nob Hill / Polk Gulch":{"drive":{"min":5,"km":2.8,"pts":[[37.78988,-122.41852],[37.78984,-122.41886],[37.79079,-122.41906],[37.79286,-122.40279],[37.79098,-122.40241],[37.79132,-122.39952],[37.79123,-122.39197]]},"walk":{"min":36,"km":2.7,"pts":[[37.78988,-122.41852],[37.79005,-122.41722],[37.78921,-122.41705],[37.79045,-122.40729],[37.79031,-122.40717],[37.79033,-122.40703],[37.78959,-122.40688],[37.78956,-122.40672],[37.78972,-122.40535],[37.78965,-122.40534],[37.79003,-122.40231],[37.79011,-122.40233],[37.79037,-122.40027],[37.79102,-122.39943],[37.79048,-122.39857],[37.78925,-122.3971],[37.79123,-122.39197]]},"bike":{"min":13,"km":2.8,"pts":[[37.78988,-122.41852],[37.78984,-122.41886],[37.79079,-122.41906],[37.79204,-122.40924],[37.79025,-122.40887],[37.79018,-122.40871],[37.79133,-122.39961],[37.79123,-122.39197]]},"transit":{"min":16,"est":true}},"Mission / Mission Dolores":{"drive":{"min":10,"km":6.1,"pts":[[37.75987,-122.4253],[37.75997,-122.4236],[37.76317,-122.42391],[37.76379,-122.41371],[37.76411,-122.41303],[37.76948,-122.4134],[37.76912,-122.40924],[37.76924,-122.4079],[37.78186,-122.39209],[37.78759,-122.39928],[37.79123,-122.39197]]},"walk":{"min":69,"km":5.2,"pts":[[37.75987,-122.4253],[37.76003,-122.42156],[37.76336,-122.42164],[37.76351,-122.41967],[37.76496,-122.41981],[37.76528,-122.41765],[37.76923,-122.41775],[37.77098,-122.41725],[37.77214,-122.41648],[37.78855,-122.39624],[37.79123,-122.39197]]},"bike":{"min":24,"km":6.3,"pts":[[37.75987,-122.4253],[37.76024,-122.41923],[37.76944,-122.42008],[37.77151,-122.41944],[37.77338,-122.41822],[37.78978,-122.39758],[37.79123,-122.39197]]},"transit":{"min":18,"est":true}}};
+const TRANSIT={"North Beach / Telegraph Hill":{"min":18,"fare":"$3.00","label":"12 bus","summary":"walk 6m → 12 bus (Broadway & Columbus Ave→Spear St & Folsom St, 9 stops) → walk 2m","lines":[{"line":"12","veh":"BUS","color":"#005b95"}],"pts":[[37.8003,-122.4097],[37.80035,-122.40934],[37.79993,-122.40918],[37.79946,-122.40881],[37.79934,-122.40867],[37.79879,-122.40779],[37.79866,-122.40757],[37.79847,-122.40739],[37.79837,-122.40722],[37.79798,-122.40668],[37.79784,-122.40639],[37.79783,-122.40638],[37.79795,-122.40616],[37.79821,-122.40412],[37.79842,-122.40239],[37.79826,-122.40221],[37.79818,-122.4022],[37.79653,-122.40185],[37.79488,-122.4014],[37.79532,-122.39839],[37.79548,-122.39684],[37.79527,-122.39681],[37.79396,-122.39654],[37.7934,-122.39641],[37.79347,-122.39609],[37.79375,-122.3956],[37.79322,-122.39494],[37.79051,-122.3915],[37.7901,-122.39109],[37.79046,-122.39162],[37.79074,-122.39164],[37.7911,-122.39214]]},"Mission Bay":{"min":36,"fare":"$0.00","label":"TC bus","summary":"walk 1m → TC bus (MBBS @ Nektar→Mission @ Spear (Embarcadero), 8 stops) → walk 4m","lines":[{"line":"TC","veh":"BUS","color":"#f15a29"}],"pts":[[37.7706,-122.3893],[37.77073,-122.38885],[37.77086,-122.38663],[37.77066,-122.38647],[37.76723,-122.38616],[37.76706,-122.38697],[37.76698,-122.38901],[37.76678,-122.39225],[37.76746,-122.39361],[37.76872,-122.39518],[37.76978,-122.39591],[37.77032,-122.39588],[37.77056,-122.39577],[37.77069,-122.39616],[37.77051,-122.39635],[37.77018,-122.39718],[37.76984,-122.39822],[37.77073,-122.39955],[37.77096,-122.39946],[37.77709,-122.3917],[37.77773,-122.39143],[37.77936,-122.39342],[37.78275,-122.39766],[37.78361,-122.39874],[37.78396,-122.39877],[37.7868,-122.39515],[37.78836,-122.39408],[37.78954,-122.39555],[37.79142,-122.39548],[37.79274,-122.39368],[37.79177,-122.39297],[37.7911,-122.39214]]},"SoMa":{"min":16,"fare":"$3.00","label":"12 bus","summary":"walk 1m → 12 bus (Folsom St & 6th St→Main St & Folsom St, 6 stops) → walk 3m","lines":[{"line":"12","veh":"BUS","color":"#005b95"}],"pts":[[37.77842,-122.4059],[37.77849,-122.40579],[37.77852,-122.40582],[37.77865,-122.40565],[37.77852,-122.40545],[37.77867,-122.40526],[37.7788,-122.40519],[37.77885,-122.40526],[37.77956,-122.40436],[37.77985,-122.40398],[37.78048,-122.4032],[37.78247,-122.40067],[37.78392,-122.39882],[37.78536,-122.39697],[37.7865,-122.39555],[37.78814,-122.39346],[37.7894,-122.39187],[37.78948,-122.39199],[37.7895,-122.39201],[37.78981,-122.39239],[37.79005,-122.39269],[37.79011,-122.39262],[37.79009,-122.39264],[37.79026,-122.39282],[37.7906,-122.39325],[37.79065,-122.39319],[37.79073,-122.39308],[37.79102,-122.39276],[37.79119,-122.39252],[37.79129,-122.39239],[37.79121,-122.39229],[37.7911,-122.39214]]},"FiDi / Embarcadero":{"min":9,"fare":"$3.00","label":"12 bus","summary":"walk 1m → 12 bus (Clay St & Front St→Spear St & Folsom St, 4 stops) → walk 2m","lines":[{"line":"12","veh":"BUS","color":"#005b95"}],"pts":[[37.79471,-122.39942],[37.79474,-122.39921],[37.79471,-122.39921],[37.79475,-122.39897],[37.79478,-122.39899],[37.79501,-122.39903],[37.79509,-122.39904],[37.79513,-122.39905],[37.79514,-122.39899],[37.79515,-122.39901],[37.79524,-122.399],[37.79525,-122.39895],[37.79531,-122.39848],[37.79534,-122.39802],[37.79548,-122.39684],[37.79501,-122.39676],[37.79483,-122.3967],[37.79392,-122.39653],[37.79372,-122.39648],[37.79325,-122.39638],[37.7938,-122.39567],[37.79358,-122.39539],[37.7919,-122.39328],[37.79067,-122.39172],[37.79014,-122.39104],[37.7901,-122.39108],[37.79042,-122.39148],[37.79046,-122.39162],[37.79056,-122.39176],[37.79074,-122.39164],[37.79084,-122.39183],[37.7911,-122.39214]]},"Potrero Hill":{"min":32,"fare":"$3.00","label":"19 bus + N tram","summary":"walk 1m → 19 bus (De Haro St & Southern Heights Ave→7th St & Market St, 18 stops) → walk 2m → N tram (Metro Civic Center Station/Downtn→The Embarcadero & Folsom St, 4 stops) → walk 4m","lines":[{"line":"19","veh":"BUS","color":"#005b95"},{"line":"N","veh":"TRAM","color":"#c41f51"}],"pts":[[37.75848,-122.40092],[37.75802,-122.40089],[37.75792,-122.40097],[37.76049,-122.40118],[37.76485,-122.40162],[37.76613,-122.40208],[37.76725,-122.40282],[37.76983,-122.40346],[37.77005,-122.40383],[37.77198,-122.4019],[37.77469,-122.40528],[37.77898,-122.41065],[37.78037,-122.41254],[37.77971,-122.41335],[37.78943,-122.40114],[37.79435,-122.39496],[37.79377,-122.39392],[37.79425,-122.39326],[37.79429,-122.39321],[37.7943,-122.39315],[37.79428,-122.39308],[37.79391,-122.39265],[37.793,-122.39159],[37.79257,-122.39112],[37.79216,-122.39081],[37.7917,-122.39059],[37.79124,-122.3903],[37.79079,-122.38991],[37.79068,-122.39001],[37.79076,-122.39029],[37.79023,-122.391],[37.7911,-122.39214]]},"South Beach / China Basin":{"min":13,"fare":"$3.00","label":"N tram","summary":"walk 5m → N tram (The Embarcadero & Brannan St→The Embarcadero & Folsom St, 1 stops) → walk 4m","lines":[{"line":"N","veh":"TRAM","color":"#c41f51"}],"pts":[[37.78274,-122.3908],[37.78308,-122.39037],[37.78348,-122.38984],[37.78358,-122.3897],[37.78362,-122.38971],[37.78373,-122.38956],[37.78461,-122.38844],[37.7847,-122.38833],[37.78464,-122.38818],[37.78471,-122.38817],[37.78443,-122.38808],[37.78375,-122.38814],[37.78572,-122.38795],[37.78708,-122.38784],[37.78782,-122.38783],[37.78818,-122.3879],[37.78922,-122.38821],[37.78946,-122.38836],[37.78989,-122.38882],[37.79048,-122.38953],[37.79074,-122.38998],[37.7907,-122.39003],[37.79064,-122.39007],[37.79062,-122.39009],[37.79064,-122.39013],[37.79076,-122.39029],[37.79074,-122.39035],[37.79062,-122.39049],[37.79023,-122.391],[37.79052,-122.39138],[37.79084,-122.39183],[37.7911,-122.39214]]},"Hayes Valley":{"min":23,"fare":"$3.00","label":"N tram","summary":"walk 11m → N tram (Van Ness→The Embarcadero & Folsom St, 5 stops) → walk 4m","lines":[{"line":"N","veh":"TRAM","color":"#c41f51"}],"pts":[[37.7766,-122.42482],[37.77675,-122.42355],[37.77684,-122.4229],[37.77689,-122.42238],[37.77702,-122.42147],[37.77654,-122.42138],[37.7762,-122.4213],[37.77587,-122.42122],[37.77541,-122.42091],[37.77508,-122.42075],[37.77492,-122.42053],[37.77464,-122.42032],[37.77486,-122.41992],[37.77508,-122.41963],[37.77531,-122.419],[37.7804,-122.41257],[37.79293,-122.39671],[37.79362,-122.39585],[37.79444,-122.39475],[37.79377,-122.39385],[37.79425,-122.39326],[37.7943,-122.39315],[37.7932,-122.39184],[37.79225,-122.39086],[37.79137,-122.3904],[37.79048,-122.38953],[37.7907,-122.39003],[37.79062,-122.39009],[37.79076,-122.39029],[37.79062,-122.39049],[37.79067,-122.39156],[37.7911,-122.39214]]},"Design District / Showplace Square":{"min":27,"fare":"$3.00","label":"19 bus + N tram","summary":"walk 1m → 19 bus (Rhode Island St & Alameda St→7th St & Market St, 9 stops) → walk 2m → N tram (Metro Civic Center Station/Downtn→The Embarcadero & Folsom St, 4 stops) → walk 4m","lines":[{"line":"19","veh":"BUS","color":"#005b95"},{"line":"N","veh":"TRAM","color":"#c41f51"}],"pts":[[37.76868,-122.40349],[37.76859,-122.40284],[37.76971,-122.40306],[37.76983,-122.40346],[37.76995,-122.40375],[37.77033,-122.40352],[37.77183,-122.40171],[37.77242,-122.40244],[37.77448,-122.40502],[37.77675,-122.40788],[37.77898,-122.41065],[37.78036,-122.41237],[37.78029,-122.41263],[37.77973,-122.41337],[37.7804,-122.41257],[37.78943,-122.40114],[37.7931,-122.3965],[37.79445,-122.39482],[37.79377,-122.39392],[37.79418,-122.39333],[37.7943,-122.3932],[37.79379,-122.3925],[37.79257,-122.39112],[37.79189,-122.39068],[37.79112,-122.3902],[37.79046,-122.38956],[37.79068,-122.39001],[37.79066,-122.3901],[37.79077,-122.39031],[37.79046,-122.39069],[37.79078,-122.39171],[37.7911,-122.39214]]},"Japantown / Fillmore edge":{"min":28,"fare":"$3.00","label":"38R bus","summary":"walk 4m → 38R bus (Geary Blvd & Laguna St→Salesforce Transit Center, 8 stops) → walk 6m","lines":[{"line":"38R","veh":"BUS","color":"#bf2b45"}],"pts":[[37.78521,-122.42952],[37.7851,-122.42848],[37.7848,-122.42806],[37.78476,-122.42819],[37.78491,-122.42783],[37.78527,-122.42487],[37.78516,-122.4241],[37.78463,-122.42336],[37.78461,-122.42249],[37.78548,-122.41564],[37.7861,-122.41068],[37.78667,-122.40634],[37.78684,-122.40501],[37.78671,-122.40466],[37.78922,-122.4015],[37.79022,-122.40021],[37.79232,-122.39758],[37.79189,-122.39677],[37.79099,-122.39565],[37.79,-122.39444],[37.78974,-122.39452],[37.78941,-122.39506],[37.78934,-122.3953],[37.78985,-122.39578],[37.78967,-122.39557],[37.7895,-122.39499],[37.78985,-122.39454],[37.79007,-122.39429],[37.79012,-122.3939],[37.7905,-122.3934],[37.79119,-122.39252],[37.7911,-122.39214]]},"NOPA":{"min":30,"fare":"$3.00","label":"24 bus + L tram","summary":"walk 2m → 24 bus (Divisadero St & Hayes St→Castro St & Market St, 7 stops) → walk 1m → L tram (Castro Station→Embarcadero Station, 6 stops) → walk 6m","lines":[{"line":"24","veh":"BUS","color":"#005b95"},{"line":"L","veh":"TRAM","color":"#942d83"}],"pts":[[37.77474,-122.43948],[37.77484,-122.43791],[37.77433,-122.43774],[37.77059,-122.43699],[37.77,-122.43647],[37.7694,-122.436],[37.76764,-122.43567],[37.76315,-122.43526],[37.76248,-122.4352],[37.76245,-122.43527],[37.76282,-122.43476],[37.7642,-122.43309],[37.76744,-122.42899],[37.76866,-122.42756],[37.77021,-122.42553],[37.77135,-122.42408],[37.7725,-122.42262],[37.77409,-122.42055],[37.77566,-122.41857],[37.77745,-122.41627],[37.78162,-122.41101],[37.78371,-122.40838],[37.78471,-122.40708],[37.7888,-122.40198],[37.78942,-122.40113],[37.79181,-122.39811],[37.79363,-122.39577],[37.79324,-122.39482],[37.79255,-122.39392],[37.79224,-122.39357],[37.79134,-122.3924],[37.7911,-122.39214]]},"Noe Valley":{"min":29,"fare":"$3.00","label":"24 bus + M tram","summary":"walk 2m → 24 bus (Castro St & 24th St→Castro St & 17th St, 8 stops) → walk 1m → M tram (Castro Station→Embarcadero Station, 6 stops) → walk 6m","lines":[{"line":"24","veh":"BUS","color":"#005b95"},{"line":"M","veh":"TRAM","color":"#c4074e"}],"pts":[[37.75063,-122.4331],[37.75071,-122.4336],[37.75085,-122.4342],[37.75115,-122.4341],[37.75185,-122.43417],[37.75228,-122.43426],[37.7535,-122.43436],[37.76163,-122.43511],[37.76235,-122.4351],[37.76245,-122.43529],[37.76282,-122.43476],[37.7642,-122.43309],[37.76724,-122.42924],[37.76792,-122.42848],[37.77,-122.42586],[37.77077,-122.4248],[37.77301,-122.422],[37.77409,-122.42055],[37.77575,-122.41845],[37.7804,-122.41257],[37.78233,-122.41018],[37.78408,-122.40788],[37.78889,-122.40186],[37.79057,-122.39971],[37.79294,-122.39672],[37.79377,-122.39555],[37.79355,-122.39517],[37.79276,-122.3942],[37.79255,-122.39392],[37.79224,-122.39357],[37.79143,-122.39252],[37.7911,-122.39214]]},"Dogpatch":{"min":32,"fare":"$3.00","label":"15 bus + 14R bus","summary":"walk 2m → 15 bus (3rd St & 20th St→3rd St & Mission St, 3 stops) → walk 2m → 14R bus (Mission St & 3rd St→Main St & Market St, 3 stops) → walk 6m","lines":[{"line":"15","veh":"BUS","color":"#005b95"},{"line":"14R","veh":"BUS","color":"#bf2b45"}],"pts":[[37.7607,-122.38965],[37.76044,-122.38961],[37.76057,-122.38863],[37.76059,-122.38841],[37.76079,-122.38851],[37.76213,-122.38864],[37.7639,-122.38874],[37.77061,-122.38937],[37.77382,-122.38968],[37.77517,-122.38986],[37.77623,-122.39002],[37.77699,-122.39043],[37.77773,-122.39143],[37.77849,-122.39233],[37.78219,-122.39696],[37.7829,-122.39785],[37.78396,-122.39917],[37.78615,-122.40191],[37.7866,-122.40231],[37.78658,-122.40148],[37.78664,-122.40156],[37.78721,-122.40087],[37.78987,-122.39746],[37.79124,-122.39571],[37.79186,-122.39495],[37.79254,-122.39565],[37.7921,-122.3951],[37.79231,-122.39423],[37.79252,-122.39395],[37.792,-122.39326],[37.79134,-122.3924],[37.7911,-122.39214]]},"Pacific Heights":{"min":38,"fare":"$3.00","label":"22 bus + M tram","summary":"22 bus (Fillmore St & Jackson St→Church St & Market St, 15 stops) → walk 1m → M tram (Metro Church Station/Downtown→Embarcadero Station, 5 stops) → walk 6m","lines":[{"line":"22","veh":"BUS","color":"#f16d0f"},{"line":"M","veh":"TRAM","color":"#c4074e"}],"pts":[[37.79226,-122.43461],[37.79178,-122.43444],[37.78906,-122.43389],[37.77852,-122.43177],[37.77459,-122.43098],[37.77027,-122.42997],[37.77023,-122.42924],[37.76902,-122.42911],[37.76685,-122.42892],[37.76724,-122.42899],[37.76724,-122.42924],[37.76781,-122.42863],[37.77,-122.42586],[37.77106,-122.4244],[37.77211,-122.42311],[37.77399,-122.42072],[37.77507,-122.41934],[37.77664,-122.41738],[37.77868,-122.41472],[37.7822,-122.41033],[37.78371,-122.40838],[37.78547,-122.40614],[37.78776,-122.40324],[37.78942,-122.40113],[37.79145,-122.39857],[37.79293,-122.39671],[37.79378,-122.39548],[37.79267,-122.3941],[37.79252,-122.39396],[37.792,-122.39326],[37.79134,-122.3924],[37.7911,-122.39214]]},"Lower Nob Hill / Polk Gulch":{"min":25,"fare":"$9.00","label":"CA cable car","summary":"walk 3m → CA cable car (California St & Larkin St→California St & Davis St, 15 stops) → walk 9m","lines":[{"line":"CA","veh":"CABLE_CAR","color":"#b49a36"}],"pts":[[37.78981,-122.4185],[37.78975,-122.41895],[37.78994,-122.41896],[37.79028,-122.41903],[37.79072,-122.41913],[37.7909,-122.41895],[37.79095,-122.41757],[37.79142,-122.41412],[37.79181,-122.41103],[37.79205,-122.40918],[37.79227,-122.40741],[37.79281,-122.40303],[37.79303,-122.4013],[37.79334,-122.39893],[37.79361,-122.39683],[37.79362,-122.39681],[37.79355,-122.3968],[37.79342,-122.39651],[37.79353,-122.39624],[37.79352,-122.39615],[37.79385,-122.39572],[37.79383,-122.39548],[37.79378,-122.39548],[37.79347,-122.39509],[37.79306,-122.39457],[37.79267,-122.39406],[37.79252,-122.39396],[37.79234,-122.39372],[37.792,-122.39326],[37.79152,-122.39265],[37.79132,-122.39242],[37.7911,-122.39214]]},"Mission / Mission Dolores":{"min":27,"fare":"$3.00","label":"J tram","summary":"walk 5m → J tram (Right Of Way / 18th St→Embarcadero Station, 8 stops) → walk 6m","lines":[{"line":"J","veh":"TRAM","color":"#c4074e"}],"pts":[[37.75996,-122.42531],[37.75991,-122.42607],[37.75982,-122.42612],[37.75985,-122.42657],[37.75992,-122.42682],[37.7601,-122.42723],[37.76016,-122.4275],[37.76034,-122.42769],[37.76071,-122.42792],[37.76114,-122.4281],[37.76127,-122.4283],[37.76162,-122.42841],[37.7629,-122.42851],[37.76382,-122.42864],[37.76438,-122.42865],[37.76794,-122.42901],[37.76898,-122.42911],[37.76941,-122.42913],[37.76945,-122.42902],[37.76959,-122.4266],[37.76975,-122.42604],[37.77862,-122.41482],[37.79293,-122.39671],[37.79366,-122.39573],[37.79378,-122.39548],[37.79355,-122.39517],[37.79276,-122.3942],[37.79257,-122.39394],[37.79252,-122.39396],[37.79177,-122.39297],[37.79134,-122.3924],[37.7911,-122.39214]]}};
+let gkey = localStorage.getItem("sv_key")||"";
+function spotsFor(name){ return SPOTS[name] || [{c:name,q:name+", San Francisco"}]; }
+function svURL(q,w,h){ return `https://maps.googleapis.com/maps/api/streetview?size=${w}x${h}&location=${encodeURIComponent(q)}&fov=85&key=${gkey}`; }
+function mapsURL(q){ return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`; }
+const carIdx={}; // neighborhood name -> current photo index (persists across re-renders)
+function incarHTML(row){
+  const sp=spotsFor(row.name); const n=sp.length;
+  let idx=carIdx[row.name]||0; if(idx>=n||idx<0)idx=0;
+  const s=sp[idx];
+  const media = gkey ? `<img class="incimg" src="${svURL(s.q,520,312)}" alt="">` : `<div class="incph">📍 ${s.c}</div>`;
+  const dots = sp.map((_,j)=>`<span class="${j===idx?'on':''}"></span>`).join("");
+  return `
+    <div class="incstage">
+      ${media}
+      ${n>1?`<button class="incnav prev" data-cnav="prev" title="Previous">‹</button>
+      <button class="incnav next" data-cnav="next" title="Next">›</button>`:""}
+    </div>
+    <div class="inccap">${idx+1}/${n} · ${s.c} · <a href="${mapsURL(s.q)}" target="_blank" rel="noopener" class="sv">Street View ↗</a></div>
+    <div class="incdots">${dots}</div>`;
+}
+function photoCell(row,i){ return `<div class="incar" data-incar="${i}">${incarHTML(row)}</div>`; }
+function bindIncar(c,i){
+  const row=data[i];
+  c.querySelectorAll("[data-cnav]").forEach(btn=>{
+    btn.addEventListener("click",e=>{
+      e.stopPropagation();
+      const n=spotsFor(row.name).length; let idx=carIdx[row.name]||0;
+      idx = btn.dataset.cnav==="next" ? (idx+1)%n : (idx-1+n)%n;
+      carIdx[row.name]=idx; c.innerHTML=incarHTML(row); bindIncar(c,i);
+    });
+  });
+  c.querySelectorAll("img.incimg").forEach(img=>{
+    img.addEventListener("error",()=>{ img.outerHTML=`<div class="incph">⚠ no image — use Street View link</div>`; });
+  });
+}
+// ---- $/sqft range: low = lowRent/highSqft, high = highRent/lowSqft ----
+function psfRange(str){
+  if(!str) return null;
+  const parts=str.split("/"); if(parts.length<2) return null;
+  const norm=s=>s.replace(/[–—]/g,"-");
+  let r=norm(parts[0]).replace(/[~$\s]/g,""); const isK=/k/i.test(r); r=r.replace(/k/ig,"");
+  let rn=r.split("-").map(parseFloat).filter(x=>!isNaN(x)); if(!rn.length) return null;
+  if(isK) rn=rn.map(x=>x*1000);
+  const rLo=Math.min(...rn), rHi=Math.max(...rn);
+  let sq=norm(parts[1]).replace(/,/g,"").replace(/sqft/ig,"").trim();
+  let sn=sq.split("-").map(parseFloat).filter(x=>!isNaN(x)); if(!sn.length) return null;
+  const sLo=Math.min(...sn), sHi=Math.max(...sn); if(!sLo||!sHi) return null;
+  return [rLo/sHi, rHi/sLo];
+}
+function psf(str){ const r=psfRange(str); if(!r) return "—"; const f=x=>"$"+x.toFixed(1); return f(r[0])+"–"+f(r[1]); }
+function psfMid(str){ const r=psfRange(str); return r?(r[0]+r[1])/2:null; }
+// ---- Discrete, high-contrast $/sqft value tiers (cheaper = better deal) ----
+const PSF_TIERS=[
+  {max:0.20, color:"#16c60c", label:"Best value"},
+  {max:0.40, color:"#b4e000", label:"Good"},
+  {max:0.60, color:"#ffd000", label:"Average"},
+  {max:0.80, color:"#ff8c1a", label:"Pricey"},
+  {max:1.01, color:"#ff3b30", label:"Most expensive"},
+];
+function psfColor(t){ for(const tier of PSF_TIERS){ if(t<=tier.max) return tier.color; } return PSF_TIERS[PSF_TIERS.length-1].color; }
+function psfCell(str,min,max){
+  const txt=psf(str), v=psfMid(str);
+  if(v==null||!isFinite(v)||max<=min) return `<span>${txt}</span>`;
+  const t=Math.max(0,Math.min(1,(v-min)/(max-min)));
+  return `<span class="psfpill" style="background:${psfColor(t)}">${txt}</span>`;
+}
+function renderPsfLegend(min,max){
+  const el=document.getElementById("psflegend"); if(!el) return;
+  let html='<span class="psflegend-title">$/sqft value</span>';
+  if(!(isFinite(min)&&isFinite(max)&&max>min)){
+    PSF_TIERS.forEach(tr=>{ html+=`<span class="psfkey"><span class="psfsw" style="background:${tr.color}"></span>${tr.label}</span>`; });
+  } else {
+    const f=x=>"$"+(min+x*(max-min)).toFixed(1);
+    let lo=0;
+    PSF_TIERS.forEach(tr=>{
+      const hi=Math.min(tr.max,1);
+      html+=`<span class="psfkey"><span class="psfsw" style="background:${tr.color}"></span>${tr.label} <span class="psflegend-rng">${f(lo)}–${f(hi)}</span></span>`;
+      lo=tr.max;
+    });
+  }
+  html+='<span class="psflegend-note">cheaper $/sqft = better deal · color applies to the pill in the Rent · size · $/sqft column</span>';
+  el.innerHTML=html;
+}
+
+const weights = {w:7,c:7,s:7,v:7};
+const RKEYS=[["w","Walk"],["c","Commute"],["s","Safety/Parks"],["v","Value"]];
+
+function save(){ localStorage.setItem(KEY, JSON.stringify(data)); }
+function score(row){
+  const tot = weights.w+weights.c+weights.s+weights.v || 1;
+  const s = row.r.w*weights.w + row.r.c*weights.c + row.r.s*weights.s + row.r.v*weights.v;
+  return s/tot;
+}
+function fitLabel(f){ return f==="yes"?["Yes","fit-yes"]:f==="edge"?["Low end","fit-edge"]:["No","fit-no"]; }
+function cycleFit(f){ return f==="yes"?"edge":f==="edge"?"no":"yes"; }
+
+// ---- Listings (per-district rentals to tour) ----
+function listPsf(l){ const r=+l.rent,s=+l.sqft; return (r&&s)?("$"+(r/s).toFixed(1)):"—"; }
+function ratingColor(v){ v=+v; if(isNaN(v))return "var(--chip)"; const t=Math.max(0,Math.min(1,v/10)); return `hsl(${(t*130).toFixed(0)},65%,52%)`; }
+function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function listingsPanelHTML(row,ni){
+  const rows=row.listings.map((l,li)=>{
+    const thumb = l.img
+      ? `<img class="lthumb" src="${esc(l.img)}" alt="" onerror="this.outerHTML='<div class=\\'lthumb ph\\'>image link<br>broken</div>'">`
+      : `<div class="lthumb ph">no image</div>`;
+    const photo = l.url ? `<a href="${esc(l.url)}" target="_blank" rel="noopener">${thumb}</a>` : thumb;
+    const rt = (l.rating==null||l.rating==="")?"–":l.rating;
+    return `<tr>
+      <td class="lphoto">${photo}<div class="laddr editable" data-lf="address" data-ni="${ni}" data-li="${li}">${esc(l.address)||"address…"}</div></td>
+      <td><span class="editable" data-lf="beds" data-ni="${ni}" data-li="${li}">${l.beds??"?"}</span> bd / <span class="editable" data-lf="baths" data-ni="${ni}" data-li="${li}">${l.baths??"?"}</span> ba</td>
+      <td class="lprice">$<span class="editable" data-lf="rent" data-ni="${ni}" data-li="${li}">${l.rent??"?"}</span></td>
+      <td><span class="editable" data-lf="sqft" data-ni="${ni}" data-li="${li}">${l.sqft??"?"}</span></td>
+      <td class="lpsf">${listPsf(l)}</td>
+      <td><span class="lrate editable" data-lf="rating" data-ni="${ni}" data-li="${li}" style="background:${ratingColor(l.rating)}">${rt}</span><span class="lrate-max">/10</span></td>
+      <td>${l.url?`<a class="sv" href="${esc(l.url)}" target="_blank" rel="noopener">↗</a>`:""}</td>
+      <td><button class="ldel" data-ni="${ni}" data-li="${li}" title="Remove listing">✕</button></td>
+    </tr>`;
+  }).join("");
+  const empty = row.listings.length?"":`<tr><td colspan="8" class="lempty">No listings yet — add one below, or use “Import listings JSON”.</td></tr>`;
+  return `
+    <div class="lpanel">
+      <div class="lpanel-h">🏠 Listings to tour in ${esc(row.name)}</div>
+      <table class="ltbl">
+        <thead><tr><th>Photo / address</th><th>Bed / bath</th><th>Price</th><th>Sqft</th><th>$/sqft</th><th>Rating</th><th></th><th></th></tr></thead>
+        <tbody>${empty}${rows}</tbody>
+      </table>
+      <div class="addlist" data-ni="${ni}">
+        <input data-af="img" placeholder="Image URL (optional)">
+        <input data-af="url" placeholder="Listing URL">
+        <input data-af="address" placeholder="Address">
+        <input data-af="beds" class="sm" placeholder="Bd">
+        <input data-af="baths" class="sm" placeholder="Ba">
+        <input data-af="rent" class="sm" placeholder="$">
+        <input data-af="sqft" class="sm" placeholder="Sqft">
+        <input data-af="rating" class="sm" placeholder="/10">
+        <button class="laddbtn" data-ni="${ni}">+ Add listing</button>
+      </div>
+    </div>`;
+}
+function bindListings(){
+  document.querySelectorAll(".listtog").forEach(el=>{
+    el.addEventListener("click",e=>{
+      const tr=e.target.closest("tr.row"); const name=data[+tr.dataset.i].name;
+      if(openListings.has(name)) openListings.delete(name); else openListings.add(name);
+      render();
+    });
+  });
+  document.querySelectorAll("[data-lf]").forEach(el=>{
+    el.contentEditable=true;
+    el.addEventListener("blur",e=>{
+      const ni=+el.dataset.ni, li=+el.dataset.li, f=el.dataset.lf;
+      let v=el.textContent.trim();
+      if(["beds","baths","rent","sqft","rating"].includes(f)){
+        v=v.replace(/[^0-9.]/g,""); v=(v===""?null:+v);
+        if(f==="rating"&&v!=null) v=Math.max(0,Math.min(10,v));
+      } else if(f==="address" && v==="address…"){ v=""; }
+      data[ni].listings[li][f]=v; save(); render();
+    });
+    el.addEventListener("keydown",e=>{ if(e.key==="Enter"){e.preventDefault();el.blur();} });
+  });
+  document.querySelectorAll(".ldel").forEach(el=>{
+    el.addEventListener("click",e=>{
+      const ni=+el.dataset.ni, li=+el.dataset.li;
+      data[ni].listings.splice(li,1); save(); render();
+    });
+  });
+  document.querySelectorAll(".laddbtn").forEach(btn=>{
+    btn.addEventListener("click",e=>{
+      const ni=+btn.dataset.ni, form=btn.closest(".addlist");
+      const get=k=>{ const i=form.querySelector(`[data-af="${k}"]`); return i?i.value.trim():""; };
+      const num=k=>{ const v=get(k).replace(/[^0-9.]/g,""); return v===""?null:+v; };
+      const l={img:get("img"),url:get("url"),address:get("address"),beds:num("beds"),baths:num("baths"),rent:num("rent"),sqft:num("sqft"),rating:num("rating")};
+      if(!l.address&&!l.url&&l.rent==null){ alert("Add at least an address, a URL, or a price."); return; }
+      data[ni].listings.push(l); save(); render();
+    });
+  });
+}
+function findDistrict(nb){
+  if(!nb) return -1;
+  nb=String(nb).toLowerCase().trim();
+  let i=data.findIndex(d=>d.name.toLowerCase()===nb); if(i>=0) return i;
+  return data.findIndex(d=>{ const dn=d.name.toLowerCase(); return dn.includes(nb)||nb.includes(dn.split(" / ")[0].trim()); });
+}
+function mergeListings(items){
+  let pairs=[];
+  if(Array.isArray(items)) pairs=items.map(x=>[x.neighborhood||x.district||"",x]);
+  else if(items&&typeof items==="object") Object.entries(items).forEach(([nb,arr])=>{ (arr||[]).forEach(x=>pairs.push([nb,x])); });
+  let added=0; const unmatched=new Set();
+  pairs.forEach(([nb,x])=>{
+    const di=findDistrict(nb);
+    if(di<0){ unmatched.add(nb||"(blank)"); return; }
+    const l={img:x.img||x.image||"",url:x.url||"",address:x.address||"",
+      beds:x.beds??null,baths:x.baths??null,rent:x.rent??x.price??null,sqft:x.sqft??null,rating:x.rating??null};
+    const dupe=data[di].listings.some(e=>(l.url&&e.url===l.url)||(l.address&&e.address===l.address));
+    if(dupe) return;
+    data[di].listings.push(l); openListings.add(data[di].name); added++;
+  });
+  save(); render();
+  alert(`Imported ${added} listing(s).`+(unmatched.size?`\n\nNo matching district for: ${[...unmatched].join(", ")}`:""));
+}
+function readJsonFile(f){
+  if(!f) return;
+  const rd=new FileReader();
+  rd.onload=()=>{ try{ mergeListings(JSON.parse(rd.result)); }catch(err){ alert("Couldn't parse JSON: "+err.message); } };
+  rd.readAsText(f);
+}
+
+function render(){
+  const body=document.getElementById("body");
+  body.innerHTML="";
+  const maxScore=Math.max(...data.map(score),0.001);
+  const allMid=[]; data.forEach(r=>{ [psfMid(r.oneBR),psfMid(r.twoBR)].forEach(m=>{ if(m!=null&&isFinite(m)) allMid.push(m); }); });
+  const pMin=allMid.length?Math.min(...allMid):0, pMax=allMid.length?Math.max(...allMid):1;
+  renderPsfLegend(pMin,pMax);
+  data.forEach((row,i)=>{
+    const tr=document.createElement("tr");
+    tr.className="row"; tr.draggable=true; tr.dataset.i=i;
+    const sc=score(row);
+    tr.innerHTML=`
+      <td class="drag" title="Drag to reprioritize">⠿</td>
+      <td class="rank">${i+1}</td>
+      <td><div class="nb editable" data-f="name">${row.name}</div></td>
+      <td>${photoCell(row,i)}</td>
+      <td class="vibe editable" data-f="vibe">${row.vibe||""}</td>
+      <td class="notables editable" data-f="notables">${row.notables||""}</td>
+      <td class="commute editable" data-f="commute">${row.commute}</td>
+      <td class="rentcol">
+        <div class="rrow"><span class="brtag">1BR</span><span class="editable rtxt" data-f="oneBR">${row.oneBR}</span>${psfCell(row.oneBR,pMin,pMax)}</div>
+        <div class="rrow"><span class="brtag">2BR</span><span class="editable rtxt" data-f="twoBR">${row.twoBR}</span>${psfCell(row.twoBR,pMin,pMax)}</div>
+      </td>
+      <td class="safety editable" data-f="safety">${row.safety}</td>
+      <td class="parks editable" data-f="parks">${row.parks}</td>
+      <td><div class="ratings">
+        ${RKEYS.map(([k,lbl])=>`<span class="rcell ${k}" data-r="${k}" title="${lbl}: click to change">${row.r[k]}</span>`).join("")}
+      </div></td>
+      <td><div class="score">${sc.toFixed(2)}</div><div class="scorebar" style="width:${Math.round(sc/maxScore*100)}%"></div></td>
+      <td class="listtog">${openListings.has(row.name) ? `▾ ${row.listings.length}` : (row.listings.length ? `▸ ${row.listings.length}` : `+ add`)}</td>
+      <td><div class="note editable" data-f="note">${row.note}</div></td>
+      <td class="delcol"><button data-del="1" title="Remove">✕</button></td>`;
+    body.appendChild(tr);
+    if(openListings.has(row.name)){
+      const lr=document.createElement("tr"); lr.className="listrow";
+      lr.innerHTML=`<td colspan="15">${listingsPanelHTML(row,i)}</td>`;
+      body.appendChild(lr);
+    }
+  });
+  bindRow();
+  bindListings();
+  save();
+}
+
+function bindRow(){
+  document.querySelectorAll("[data-f]").forEach(el=>{
+    el.contentEditable=true;
+    el.addEventListener("blur",e=>{
+      const i=+e.target.closest("tr").dataset.i;
+      data[i][e.target.dataset.f]=e.target.textContent.trim();
+      save();
+    });
+    el.addEventListener("keydown",e=>{ if(e.key==="Enter"&&el.classList.contains("nb")){e.preventDefault();el.blur();} });
+  });
+  document.querySelectorAll("[data-r]").forEach(el=>{
+    el.addEventListener("click",e=>{
+      const tr=e.target.closest("tr"); const i=+tr.dataset.i; const k=e.target.dataset.r;
+      data[i].r[k]=data[i].r[k]>=5?1:data[i].r[k]+1; render();
+    });
+  });
+  document.querySelectorAll("[data-fit]").forEach(el=>{
+    el.addEventListener("click",e=>{ const i=+e.target.closest("tr").dataset.i; data[i].fit=cycleFit(data[i].fit); render(); });
+  });
+  document.querySelectorAll("[data-del]").forEach(el=>{
+    el.addEventListener("click",e=>{ const i=+e.target.closest("tr").dataset.i; if(confirm("Remove "+data[i].name+"?")){data.splice(i,1);render();} });
+  });
+  document.querySelectorAll(".incar").forEach(c=>bindIncar(c,+c.dataset.incar));
+  let dragI=null;
+  document.querySelectorAll("tr.row").forEach(tr=>{
+    tr.addEventListener("dragstart",e=>{dragI=+tr.dataset.i;tr.classList.add("dragging");});
+    tr.addEventListener("dragend",()=>{tr.classList.remove("dragging");document.querySelectorAll("tr.over").forEach(r=>r.classList.remove("over"));});
+    tr.addEventListener("dragover",e=>{e.preventDefault();tr.classList.add("over");});
+    tr.addEventListener("dragleave",()=>tr.classList.remove("over"));
+    tr.addEventListener("drop",e=>{
+      e.preventDefault(); const dropI=+tr.dataset.i;
+      if(dragI===null||dragI===dropI)return;
+      const [m]=data.splice(dragI,1); data.splice(dropI,0,m); dragI=null; render();
+    });
+  });
+}
+
+[["ww","w","lw"],["wc","c","lc"],["ws","s","ls"],["wv","v","lv"]].forEach(([id,k,lab])=>{
+  const el=document.getElementById(id);
+  el.addEventListener("input",()=>{ weights[k]=+el.value; document.getElementById(lab).textContent=el.value; render(); refreshMapIfVisible(); });
+});
+
+document.getElementById("sortScore").onclick=()=>{ data.sort((a,b)=>score(b)-score(a)); render(); };
+document.getElementById("restoreOrder").onclick=()=>{
+  const order=DEFAULTS.map(d=>d.name);
+  data.sort((a,b)=>order.indexOf(a.name)-order.indexOf(b.name)); render();
+};
+document.getElementById("reset").onclick=()=>{ if(confirm("Reset all data and ratings to verified defaults?")){data=JSON.parse(JSON.stringify(DEFAULTS));render();} };
+document.getElementById("addRow").onclick=()=>{
+  data.unshift({name:"New neighborhood",vibe:"",notables:"",oneBR:"",twoBR:"",twoBRcorr:"",commute:"",safety:"",parks:"",fit:"edge",r:{w:3,c:3,s:3,v:3},note:""});
+  render();
+};
+document.getElementById("exportJson").onclick=()=>dl("sf_neighborhoods.json",JSON.stringify(data,null,2));
+document.getElementById("exportCsv").onclick=()=>{
+  const cols=["rank","name","vibe","notables","commute","oneBR","twoBR","safety","parks","fit","w","c","s","v","score","note"];
+  const rows=[cols.join(",")];
+  data.forEach((r,i)=>rows.push([i+1,r.name,r.vibe,r.notables,r.commute,r.oneBR,r.twoBR,r.safety,r.parks,r.fit,r.r.w,r.r.c,r.r.s,r.r.v,score(r).toFixed(2),r.note]
+    .map(x=>`"${String(x==null?"":x).replace(/"/g,'""')}"`).join(",")));
+  dl("sf_neighborhoods.csv",rows.join("\n"));
+};
+document.getElementById("copySummary").onclick=()=>{
+  const txt=data.map((r,i)=>`${i+1}. ${r.name} — score ${score(r).toFixed(2)} | 2BR ${r.twoBR} | fit:${r.fit} | W${r.r.w} C${r.r.c} S${r.r.s} V${r.r.v}${r.note?` | ${r.note}`:""}`).join("\n");
+  const weightsLine=`Weights — Walk:${weights.w} Commute:${weights.c} Safety/Parks:${weights.s} Value:${weights.v}\n\n`;
+  navigator.clipboard.writeText(weightsLine+txt).then(()=>{const b=document.getElementById("copySummary");b.textContent="Copied!";setTimeout(()=>b.textContent="Copy summary for chat",1500);});
+};
+function dl(name,content){
+  const blob=new Blob([content],{type:"text/plain"});const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);a.download=name;a.click();
+}
+
+// ---- Listings import (file picker + drag-drop a .json onto the page) ----
+document.getElementById("importListings").onclick=()=>document.getElementById("lfile").click();
+document.getElementById("lfile").addEventListener("change",e=>{ readJsonFile(e.target.files[0]); e.target.value=""; });
+window.addEventListener("dragover",e=>{ e.preventDefault(); });
+window.addEventListener("drop",e=>{
+  const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];
+  if(f&&/\.json$/i.test(f.name)){ e.preventDefault(); readJsonFile(f); }
+});
+
+document.querySelectorAll("th[data-k]").forEach(th=>{
+  th.addEventListener("click",()=>{
+    const k=th.dataset.k;
+    if(k==="score"){data.sort((a,b)=>score(b)-score(a));}
+    else{data.sort((a,b)=>String(a[k]).localeCompare(String(b[k])));}
+    render();
+  });
+});
+
+// ---- Photo carousel ----
+let cur={list:[],idx:0};
+function openCarousel(i){
+  const row=data[i]; cur.list=spotsFor(row.name); cur.idx=0;
+  document.getElementById("lbTitle").textContent=row.name+" — representative spots";
+  showSlide(); document.getElementById("modal").classList.add("open");
+}
+function phEl(s){
+  const d=document.createElement("div"); d.className="ph media";
+  d.innerHTML=`📍 ${s.c}<br><span style="font-size:12px;color:var(--muted)">Click “Open in Google Maps / Street View ↗” below to view this spot</span>`;
+  return d;
+}
+function showSlide(){
+  const s=cur.list[cur.idx]; const stage=document.getElementById("lbStage");
+  stage.querySelectorAll(".media").forEach(n=>n.remove());
+  let m;
+  if(gkey){ m=document.createElement("img"); m.className="media"; m.src=svURL(s.q,760,456); m.onerror=()=>{ m.replaceWith(phEl(s)); }; }
+  else { m=phEl(s); }
+  stage.insertBefore(m, document.getElementById("lbNext"));
+  document.getElementById("lbCap").textContent=`${cur.idx+1}/${cur.list.length} · ${s.c}`;
+  document.getElementById("lbLink").href=mapsURL(s.q);
+  const dots=document.getElementById("lbDots"); dots.innerHTML="";
+  cur.list.forEach((_,j)=>{ const d=document.createElement("span"); if(j===cur.idx)d.className="on"; d.onclick=()=>{cur.idx=j;showSlide();}; dots.appendChild(d); });
+}
+document.getElementById("lbPrev").onclick=()=>{cur.idx=(cur.idx-1+cur.list.length)%cur.list.length;showSlide();};
+document.getElementById("lbNext").onclick=()=>{cur.idx=(cur.idx+1)%cur.list.length;showSlide();};
+document.getElementById("lbClose").onclick=()=>document.getElementById("modal").classList.remove("open");
+document.getElementById("modal").addEventListener("click",e=>{ if(e.target.id==="modal") e.currentTarget.classList.remove("open"); });
+document.addEventListener("keydown",e=>{
+  if(!document.getElementById("modal").classList.contains("open"))return;
+  if(e.key==="Escape")document.getElementById("lbClose").click();
+  if(e.key==="ArrowLeft")document.getElementById("lbPrev").click();
+  if(e.key==="ArrowRight")document.getElementById("lbNext").click();
+});
+// ---- Street View key ----
+function testKey(){
+  const stat=document.getElementById("keystat");
+  if(!gkey){ stat.textContent=""; return; }
+  stat.textContent="Testing key…"; stat.style.color="";
+  const t=new Image();
+  t.onload=()=>{ stat.style.color="var(--good)"; stat.textContent="✅ Key works — photos load inline."; };
+  t.onerror=()=>{ stat.style.color="var(--warn)";
+    stat.innerHTML="⚠ Request blocked by Google. Check all three: (1) the <b>Street View Static API</b> is ENABLED in your project, (2) <b>billing</b> is enabled, (3) the key has <b>no HTTP-referrer restriction</b> (set Application restrictions to “None”, since this is a local file with no referrer)."; };
+  t.src=svURL("Ferry Building, San Francisco",90,68)+"&_cb="+Date.now();
+}
+document.getElementById("gkey").value=gkey;
+function applyKey(){
+  gkey=document.getElementById("gkey").value.trim();
+  localStorage.setItem("sv_key",gkey);
+  render(); testKey();
+}
+document.getElementById("savekey").onclick=applyKey;
+document.getElementById("gkey").addEventListener("change",applyKey);
+if(gkey) testKey();
+
+// ---- Map view (Leaflet) ----
+let map=null, markerLayer=null, routeLayer=null, mapMetric="score", mapReady=false, lockedRoute=null;
+const MODEMETA={walk:{c:"#3ecf8e",label:"Walk"},transit:{c:"#9d8bff",label:"Transit"},bike:{c:"#5b8cff",label:"Bike"},drive:{c:"#f5a623",label:"Drive"}};
+const ROUTE_COLOR="#ff1493"; // bright pink — drawn route paths use this for max contrast against the map
+function repModeOf(name){ const r=ROUTES[name]; if(!r) return null; return (r.walk && r.walk.min<=28) ? "walk" : "transit"; }
+function drawRoute(name,mode){
+  if(!routeLayer) return;
+  routeLayer.clearLayers();
+  if(mode==="transit"){
+    const tr=TRANSIT[name];
+    if(tr && tr.pts){
+      const line=L.polyline(tr.pts,{color:ROUTE_COLOR,weight:6,opacity:1});
+      line.bindTooltip(`Transit · ${tr.label}: ${tr.min} min${tr.fare?` · ${tr.fare}`:""}`,{permanent:true,direction:"center",className:"routelbl"});
+      routeLayer.addLayer(line);
+    } else { const c=COORDS[name]; if(c){ routeLayer.addLayer(L.polyline([c,OFFICE],{color:ROUTE_COLOR,weight:5,opacity:1,dashArray:"6,7"})); } }
+    return;
+  }
+  const r=ROUTES[name]; if(!r||!r[mode]||!r[mode].pts) return;
+  const meta=MODEMETA[mode], info=r[mode];
+  const line=L.polyline(info.pts,{color:ROUTE_COLOR,weight:6,opacity:1});
+  line.bindTooltip(`${meta.label}: ${info.min} min${info.km?` · ${info.km} km`:""}`,{permanent:true,direction:"center",className:"routelbl"});
+  routeLayer.addLayer(line);
+}
+function clearRoute(){ if(routeLayer) routeLayer.clearLayers(); }
+window.__route=function(name,mode){ lockedRoute=name; drawRoute(name,mode); };
+function commuteHTML(row){
+  const r=ROUTES[row.name]; if(!r) return "";
+  const tr=TRANSIT[row.name];
+  const rm=repModeOf(row.name);
+  const btns=["walk","transit","bike","drive"].map(mode=>{
+    let mn;
+    if(mode==="transit"){ if(!tr) return ""; mn=tr.min; }
+    else { if(!r[mode]) return ""; mn=r[mode].min; }
+    const meta=MODEMETA[mode];
+    const star= mode===rm ? " ★" : "";
+    return `<button class="cbtn" onclick="window.__route('${row.name.replace(/'/g,"\\\\'")}','${mode}')"><span class="cdot" style="background:${meta.c}"></span>${meta.label} ${mn}m${star}</button>`;
+  }).join("");
+  const sum = tr ? `<div class="mpop-transit"><b>Best transit:</b> ${tr.label} · ${tr.min}m${tr.fare?` · ${tr.fare}`:""}<br><span style="color:#666">${tr.summary}</span></div>` : "";
+  return `<div class="mpop-commute"><b>Commute to 201 Spear St</b> <span style="color:#888">★ best · click to draw</span><div class="cbtns">${btns}</div>${sum}</div>`;
+}
+function commuteTipHTML(row){
+  const r=ROUTES[row.name]; if(!r) return "";
+  const tr=TRANSIT[row.name];
+  const rm=repModeOf(row.name);
+  const chip=(mode,mn)=>{ const meta=MODEMETA[mode]; const star=mode===rm?" ★":""; return `<span class="tcm"><span class="cdot" style="background:${meta.c}"></span>${meta.label} ${mn}m${star}</span>`; };
+  let chips="";
+  if(r.walk) chips+=chip("walk",r.walk.min);
+  if(tr) chips+=chip("transit",tr.min);
+  if(r.bike) chips+=chip("bike",r.bike.min);
+  if(r.drive) chips+=chip("drive",r.drive.min);
+  const sum= tr ? `<div class="tcsum"><b>Best transit:</b> ${tr.label} · ${tr.min}m${tr.fare?` · ${tr.fare}`:""}<br>${tr.summary}</div>` : "";
+  return `<div class="tcommute"><div class="tch">Commute to 201 Spear St</div><div class="tcchips">${chips}</div>${sum}</div>`;
+}
+function goodness(row,metric,allScores,psfMin,psfMax){
+  if(metric==="psf"){ const v=psfMid(row.twoBR); if(v==null||!isFinite(v))return null;
+    return psfMax>psfMin?(psfMax-v)/(psfMax-psfMin):0.5; }
+  if(metric==="commute"){ return (row.r.c-1)/4; }
+  const v=score(row), mn=Math.min(...allScores), mx=Math.max(...allScores);
+  return mx>mn?(v-mn)/(mx-mn):0.5;
+}
+function popupHTML(row,i){
+  const sp=spotsFor(row.name)[0];
+  const chips=RKEYS.map(([k,lbl])=>`<span class="pchip pchip-${k}">${lbl[0]} ${row.r[k]}</span>`).join("");
+  return `<div class="mpop">
+    <div class="mpop-h">#${i+1} · ${row.name}</div>
+    <div class="mpop-vibe">${row.vibe||""}</div>
+    <div class="mpop-rent">1BR ${row.oneBR} · ${psf(row.oneBR)}/sqft<br>2BR ${row.twoBR} · ${psf(row.twoBR)}/sqft</div>
+    <div class="mpop-row"><b>Commute:</b> ${row.commute}</div>
+    <div class="mpop-row"><b>Safety:</b> ${row.safety}</div>
+    <div class="mpop-row"><b>Parks:</b> ${row.parks}</div>
+    ${commuteHTML(row)}
+    <div class="mpop-score">Score ${score(row).toFixed(2)} ${chips}</div>
+    <a href="${mapsURL(sp.q)}" target="_blank" rel="noopener" class="sv">Open in Street View ↗</a>
+  </div>`;
+}
+function drawMarkers(){
+  if(!map||!markerLayer) return;
+  markerLayer.clearLayers();
+  const allScores=data.map(score);
+  const psfVals=data.map(r=>psfMid(r.twoBR)).filter(v=>v!=null&&isFinite(v));
+  const psfMin=Math.min(...psfVals), psfMax=Math.max(...psfVals);
+  let plotted=0;
+  data.forEach((row,i)=>{
+    const c=COORDS[row.name]; if(!c) return;
+    const g=goodness(row,mapMetric,allScores,psfMin,psfMax); if(g==null) return;
+    const hue=130*Math.max(0,Math.min(1,g));
+    const pv=psfMid(row.twoBR);
+    let radius=16;
+    if(pv!=null&&psfMax>psfMin){ const valGood=(psfMax-pv)/(psfMax-psfMin); radius=11+valGood*15; }
+    const m=L.circleMarker(c,{radius,fillColor:`hsl(${hue.toFixed(0)},68%,47%)`,color:"#0b0d12",weight:1.5,fillOpacity:.85});
+    m.bindTooltip(`<div class="mtip"><b>${i+1}. ${row.name}</b><br>`+
+      `<span class="tw">W ${row.r.w}</span> <span class="tc">C ${row.r.c}</span> `+
+      `<span class="ts">S ${row.r.s}</span> <span class="tv">V ${row.r.v}</span><br>`+
+      `<span style="color:#555">Weighted score</span> <b>${score(row).toFixed(2)}</b>`+
+      commuteTipHTML(row)+`</div>`,
+      {direction:"top",opacity:1,maxWidth:360});
+    m.bindPopup(popupHTML(row,i),{maxWidth:300});
+    m.on("mouseover",()=>{ if(!lockedRoute){ const rm=repModeOf(row.name); if(rm) drawRoute(row.name,rm); } });
+    m.on("mouseout",()=>{ if(!lockedRoute) clearRoute(); });
+    m.on("popupopen",()=>{ lockedRoute=row.name; const rm=repModeOf(row.name); if(rm) drawRoute(row.name,rm); });
+    m.on("popupclose",()=>{ lockedRoute=null; clearRoute(); });
+    markerLayer.addLayer(m); plotted++;
+  });
+  return plotted;
+}
+function initMap(){
+  if(mapReady||typeof L==="undefined") return;
+  map=L.map('map',{scrollWheelZoom:true}).setView([37.773,-122.418],13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
+  const office=L.marker(OFFICE).addTo(map);
+  office.bindTooltip("Your office — 201 Spear St",{direction:"top"});
+  office.bindPopup("<div class='mpop'><div class='mpop-h'>📍 Your office</div>201 Spear St, San Francisco</div>");
+  routeLayer=L.layerGroup().addTo(map);
+  markerLayer=L.layerGroup().addTo(map);
+  mapReady=true;
+}
+function refreshMapIfVisible(){ if(mapReady && document.getElementById('mapView').style.display!=='none') drawMarkers(); }
+function showView(which){
+  const t=document.getElementById("tableView"), mv=document.getElementById("mapView");
+  const bt=document.getElementById("tabTable"), bm=document.getElementById("tabMap");
+  if(which==="map"){
+    t.style.display="none"; mv.style.display="block"; bm.classList.add("active"); bt.classList.remove("active");
+    initMap();
+    if(map){ setTimeout(()=>{ map.invalidateSize(); drawMarkers(); },40); }
+  } else {
+    mv.style.display="none"; t.style.display="block"; bt.classList.add("active"); bm.classList.remove("active");
+  }
+}
+document.getElementById("tabTable").onclick=()=>showView("table");
+document.getElementById("tabMap").onclick=()=>showView("map");
+document.querySelectorAll("[data-metric]").forEach(b=>b.onclick=()=>{
+  mapMetric=b.dataset.metric;
+  document.querySelectorAll("[data-metric]").forEach(x=>x.classList.toggle("active",x===b));
+  drawMarkers();
+});
+
+render();
+</script>
+</body>
+</html>
