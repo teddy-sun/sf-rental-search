@@ -152,6 +152,25 @@
   .addlist input{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:7px;padding:6px 9px;font-size:12px}
   .addlist input.sm{width:64px}
   .laddbtn{background:var(--accent);border-color:var(--accent);color:#fff}
+  /* all-listings aggregate table */
+  table.alltbl{width:100%;font-size:13px}
+  table.alltbl th{position:sticky;top:0;z-index:2;background:var(--panel2);text-transform:none;letter-spacing:0;font-size:11px;cursor:default;padding:8px 11px;white-space:nowrap}
+  table.alltbl td{padding:8px 11px;vertical-align:middle;border-bottom:1px solid var(--line)}
+  table.alltbl tr:hover td{background:#141821}
+  table.alltbl .ldist{color:var(--text);font-weight:600;white-space:nowrap}
+  table.alltbl .laddr{max-width:260px}
+  /* Editable Listings grid */
+  .alltbl .ldist-sel{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:4px 6px;font-size:12px;max-width:160px}
+  .alltbl .gtxt{min-width:120px;max-width:220px;white-space:normal;line-height:1.35;color:var(--text)}
+  [contenteditable].editable:empty:before{content:attr(data-ph);color:var(--muted)}
+  .alltbl .lurl.editable{display:block;font-size:10px;color:var(--accent);max-width:200px;word-break:break-all;margin-top:3px}
+  .alltbl .gdel{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:6px;cursor:pointer;padding:2px 8px;font-size:12px}
+  .alltbl .gdel:hover{color:var(--bad);border-color:var(--bad)}
+  .gaddrow td{background:#0f1420;padding:10px 11px}
+  .gaddrow .gaddwrap{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .gaddrow input,.gaddrow select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:7px;padding:6px 9px;font-size:12px}
+  .gaddrow input.sm{width:62px}
+  .gaddbtn{background:var(--accent);color:#0b0d12;border:none;border-radius:7px;padding:7px 12px;font-weight:700;cursor:pointer;font-size:12px}
   .leaflet-tooltip.routelbl{background:rgba(15,17,21,.9);border:none;color:#fff;font-weight:700;font-size:11px;padding:2px 7px;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.4)}
   .leaflet-tooltip.routelbl:before{display:none}
   .mpop-commute{margin-top:8px;border-top:1px solid #ddd;padding-top:7px;font-size:12px}
@@ -178,6 +197,7 @@
   <div class="tabs">
     <button id="tabTable" class="tab active">▦ Table</button>
     <button id="tabMap" class="tab">🗺 Map</button>
+    <button id="tabListings" class="tab">🏠 Listings</button>
   </div>
 
   <div id="tableView">
@@ -193,8 +213,11 @@
     <button id="copySummary">Copy summary for chat</button>
     <button id="importListings">Import listings JSON</button>
     <input type="file" id="lfile" accept="application/json,.json" style="display:none">
+    <button class="primary" id="publishJson" title="Download data.json, then commit it to your repo so everyone sees the update">⬆ Publish update (data.json)</button>
     <button id="reset" style="margin-left:auto">Reset all to verified defaults</button>
   </div>
+  <div id="syncStatus" style="font-size:12px;color:var(--muted);margin:0 0 6px 2px"></div>
+  <div id="collabStatus" style="font-size:12px;color:var(--muted);margin:0 0 6px 2px"></div>
 
   <div class="scroll">
   <table id="tbl">
@@ -230,6 +253,19 @@
       <span class="sub" style="margin-left:8px">Bubble size = 2BR value (bigger = better $/sqft). 📍 = 201 Spear St. Hover a bubble to draw its best commute route; click for all modes — transit shows real BART/Muni lines (walk/transit/bike/drive).</span>
     </div>
     <div id="map"></div>
+  </div>
+
+  <div id="listingsView" style="display:none">
+    <div id="collabStatusListings" style="font-size:13px;color:var(--muted);margin:0 0 8px 0"></div>
+    <div class="sub" id="allListingsSub" style="margin-bottom:10px">Editable like a sheet — click any cell to change it, pick a district from the dropdown, use the row at the bottom to add a listing, or ✕ to remove one.</div>
+    <div class="scroll">
+      <table class="alltbl">
+        <thead><tr>
+          <th>District</th><th>Photo / address</th><th>Bd / ba</th><th>Price</th><th>Sqft</th><th>$/sqft</th><th>Rating</th><th>Notes</th><th>Tour Info</th><th></th>
+        </tr></thead>
+        <tbody id="allListingsBody"></tbody>
+      </table>
+    </div>
   </div>
 
   <div class="panel" style="margin-top:18px">
@@ -273,7 +309,21 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+/* =================== COLLABORATIVE LISTINGS (shared, everyone edits) ===================
+   Paste your two Supabase values below to turn on the shared listings table.
+   Both are safe to commit publicly (the anon key is protected by row-level security).
+   Setup steps are in SUPABASE_SETUP.md. Leave blank to keep listings local-only.       */
+const SUPABASE_URL      = "https://xqssqxriayqxgawnybvs.supabase.co";   // project URL (no /rest/v1)
+const SUPABASE_ANON_KEY = "sb_publishable_-J4BBrseGR3rlth6-KZ6JQ_nWrCLqh_";   // publishable key (browser-safe)
+/* ===================================================================================== */
+const sb = (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase)
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
+let sbRows = [];          // last-known listings from Supabase
+let sbPollTimer = null;
+
 const DEFAULTS = [
  {name:"North Beach / Telegraph Hill", vibe:"charming, and close to FiDi",
   notables:"Italian restaurants, cafés, nightlife, Washington Square",
@@ -406,7 +456,15 @@ const SEED_LISTINGS = [
  {id:"channel-mission-bay-438", neighborhood:"Mission Bay", source:"hotpads",
   address:"Channel Mission Bay (Unit 438), San Francisco, CA 94158",
   rent:4814, beds:1, baths:1, sqft:671, rating:null,
-  url:"https://hotpads.com/channel-mission-bay-san-francisco-ca-94158-skf95d/pad", img:""}
+  url:"https://hotpads.com/channel-mission-bay-san-francisco-ca-94158-skf95d/pad", img:""},
+ {id:"300-3rd-st-apt-1012", neighborhood:"SoMa", source:"zillow",
+  address:"300 3rd St APT 1012, San Francisco, CA 94107",
+  rent:4500, beds:1, baths:1, sqft:946, rating:null,
+  url:"https://www.zillow.com/homedetails/300-3rd-St-APT-1012-San-Francisco-CA-94107/15147833_zpid/", img:""},
+ {id:"fillmore-center-m20306", neighborhood:"Japantown / Fillmore edge", source:"zillow",
+  address:"The Fillmore Center, Unit M20306, 1475 Fillmore St, San Francisco, CA 94115",
+  rent:3939, beds:1, baths:1, sqft:785, rating:null,
+  url:"https://www.zillow.com/apartments/san-francisco-ca/the-fillmore-center/5XjVzy/", img:""}
 ];
 try{
   const seeded=new Set(JSON.parse(localStorage.getItem("sf_seeded_v1")||"[]"));
@@ -568,6 +626,177 @@ function cycleFit(f){ return f==="yes"?"edge":f==="edge"?"no":"yes"; }
 function listPsf(l){ const r=+l.rent,s=+l.sqft; return (r&&s)?("$"+(r/s).toFixed(1)):"—"; }
 function ratingColor(v){ v=+v; if(isNaN(v))return "var(--chip)"; const t=Math.max(0,Math.min(1,v/10)); return `hsl(${(t*130).toFixed(0)},65%,52%)`; }
 function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+// ---- Shared listings via Supabase (collaborative table everyone with the link edits) ----
+function setCollab(msg,color){ ["collabStatus","collabStatusListings"].forEach(id=>{ const el=document.getElementById(id); if(el){ el.textContent=msg||""; el.style.color=color||"var(--muted)"; } }); }
+function rowToListing(r){
+  return { id:r.id, district:r.district,
+    img:r.img||"", url:r.url||"", address:r.address||"",
+    beds:r.beds??null, baths:r.baths??null, rent:r.rent??null, sqft:r.sqft??null, rating:r.rating??null,
+    notes:r.notes||"", tour_info:r.tour_info||"" };
+}
+async function sbFetch(){
+  if(!sb) return sbRows;
+  const {data:rows,error}=await sb.from("listings").select("*").order("created_at",{ascending:true});
+  if(error){ console.warn("Supabase fetch:",error.message); return sbRows; }
+  return rows||[];
+}
+// Rebuild each district's listings array from the shared table (Supabase is the source of truth).
+function fillListings(){
+  if(!sb) return;
+  data.forEach(d=>{ d.listings=[]; });
+  sbRows.forEach(r=>{ const di=findDistrict(r.district); if(di>=0){ data[di].listings.push(rowToListing(r)); openListings.add(data[di].name); } });
+}
+async function sbLoad(){
+  if(!sb) return;
+  sbRows=await sbFetch();
+  fillListings();
+  render();
+  setCollab(`● Live shared table — ${sbRows.length} listing${sbRows.length===1?"":"s"}. Anyone with the link can add or edit; others' changes appear within ~12s.`,"var(--good)");
+}
+async function sbInsert(obj){
+  if(!sb) return;
+  const {error}=await sb.from("listings").insert(obj);
+  if(error){ alert("Couldn't add to the shared table: "+error.message); return; }
+  await sbLoad();
+}
+async function sbUpdate(id,patch){
+  if(!sb||!id) return;
+  const {error}=await sb.from("listings").update(patch).eq("id",id);
+  if(error) console.warn("Supabase update:",error.message);
+}
+async function sbDelete(id){
+  if(!sb||!id) return;
+  const {error}=await sb.from("listings").delete().eq("id",id);
+  if(error) console.warn("Supabase delete:",error.message);
+}
+function startCollab(){
+  if(!sb){ setCollab(""); return; }
+  setCollab("Connecting to shared table…");
+  sbLoad();
+  if(sbPollTimer) clearInterval(sbPollTimer);
+  sbPollTimer=setInterval(sbLoad,12000);
+}
+
+// ---- Editable "sheet-style" Listings grid (add rows per district, edit any cell) ----
+function normListing(f,v){
+  if(["beds","baths","rent","sqft","rating"].includes(f)){
+    v=String(v==null?"":v).replace(/[^0-9.]/g,""); v=(v===""?null:+v);
+    if(f==="rating"&&v!=null) v=Math.max(0,Math.min(10,v));
+    return v;
+  }
+  return String(v==null?"":v).replace(/ /g," ").trim();
+}
+function commitListingEdit(ni,li,f,v){
+  if(!data[ni]||!data[ni].listings[li]) return;
+  data[ni].listings[li][f]=v;
+  if(sb){ sbUpdate(data[ni].listings[li].id,{[f]:v}); render(); }
+  else { save(); render(); }
+}
+function changeListingDistrict(ni,li,newName){
+  const item=data[ni]&&data[ni].listings[li];
+  if(!item || newName===data[ni].name) return;
+  if(sb) sbUpdate(item.id,{district:newName});
+  const nj=findDistrict(newName);
+  if(nj>=0){ data[ni].listings.splice(li,1); data[nj].listings.push(item); openListings.add(data[nj].name); }
+  if(!sb) save();
+  render();
+}
+function deleteGridListing(ni,li){
+  const item=data[ni]&&data[ni].listings[li];
+  if(!item) return;
+  if(!confirm("Remove this listing?")) return;
+  data[ni].listings.splice(li,1);
+  if(sb){ sbDelete(item.id); render(); } else { save(); render(); }
+}
+function addGridListing(form){
+  const sel=form.querySelector(".gadd-district");
+  const districtName=sel?sel.value:(data[0]&&data[0].name);
+  const get=k=>{ const i=form.querySelector(`[data-gaf="${k}"]`); return i?i.value.trim():""; };
+  const num=k=>{ const v=get(k).replace(/[^0-9.]/g,""); return v===""?null:+v; };
+  const l={ img:get("img"), url:get("url"), address:get("address"),
+    beds:num("beds"), baths:num("baths"), rent:num("rent"), sqft:num("sqft"), rating:num("rating"),
+    notes:get("notes"), tour_info:get("tour_info") };
+  if(!l.address && !l.url && l.rent==null){ alert("Add at least an address, a URL, or a price."); return; }
+  const nj=findDistrict(districtName);
+  if(sb){ if(nj>=0) openListings.add(data[nj].name); sbInsert(Object.assign({district:districtName}, l)); }
+  else { if(nj<0){ alert("Pick a district."); return; } data[nj].listings.push(l); save(); render(); }
+}
+function bindListingsGrid(){
+  const body=document.getElementById("allListingsBody");
+  if(!body) return;
+  body.querySelectorAll("[data-lf]").forEach(el=>{
+    el.contentEditable=true;
+    el.addEventListener("blur",()=>{
+      const ni=+el.dataset.ni, li=+el.dataset.li, f=el.dataset.lf;
+      commitListingEdit(ni,li,f,normListing(f,el.textContent));
+    });
+    el.addEventListener("keydown",e=>{ const f=el.dataset.lf; if(e.key==="Enter" && f!=="notes" && f!=="tour_info"){ e.preventDefault(); el.blur(); } });
+  });
+  body.querySelectorAll(".ldist-sel").forEach(sel=>{
+    sel.addEventListener("change",()=>changeListingDistrict(+sel.dataset.ni,+sel.dataset.li,sel.value));
+  });
+  body.querySelectorAll(".gdel").forEach(b=>{
+    b.addEventListener("click",()=>deleteGridListing(+b.dataset.ni,+b.dataset.li));
+  });
+  const af=body.querySelector(".gaddrow");
+  if(af){ const btn=af.querySelector(".gaddbtn"); if(btn) btn.addEventListener("click",()=>addGridListing(af)); }
+}
+function renderListingsView(){
+  const body=document.getElementById("allListingsBody");
+  if(!body) return;
+  const all=[];
+  data.forEach((d,ni)=>{ (d.listings||[]).forEach((l,li)=>all.push(Object.assign({_ni:ni,_li:li,_district:d.name},l))); });
+  // Group by district (in ranking order), then cheapest $/sqft first within each district.
+  all.sort((a,b)=>{
+    if(a._ni!==b._ni) return a._ni-b._ni;
+    const pa=(a.rent&&a.sqft)?a.rent/a.sqft:Infinity, pb=(b.rent&&b.sqft)?b.rent/b.sqft:Infinity;
+    return pa-pb;
+  });
+  const sub=document.getElementById("allListingsSub");
+  if(sub) sub.textContent=`${all.length} listing${all.length===1?"":"s"} across ${new Set(all.map(l=>l._district)).size} district${new Set(all.map(l=>l._district)).size===1?"":"s"} — editable: click any cell to change it, use the bottom row to add one, or ✕ to remove.`;
+  const distOptions=(sel)=>data.map(d=>`<option${d.name===sel?" selected":""}>${esc(d.name)}</option>`).join("");
+  const rows=all.map(l=>{
+    const ni=l._ni, li=l._li;
+    const thumb = l.img
+      ? `<img class="lthumb" src="${esc(l.img)}" alt="" onerror="this.outerHTML='<div class=\\'lthumb ph\\'>image link<br>broken</div>'">`
+      : `<div class="lthumb ph">no image</div>`;
+    const photo = l.url ? `<a href="${esc(l.url)}" target="_blank" rel="noopener">${thumb}</a>` : thumb;
+    const rt = (l.rating==null||l.rating==="")?"":l.rating;
+    return `<tr>
+      <td><select class="ldist-sel" data-ni="${ni}" data-li="${li}">${distOptions(l._district)}</select></td>
+      <td class="lphoto">${photo}
+        <div class="laddr editable" data-lf="address" data-ni="${ni}" data-li="${li}" data-ph="address…">${esc(l.address||"")}</div>
+        <div class="lurl editable" data-lf="url" data-ni="${ni}" data-li="${li}" data-ph="listing URL…">${esc(l.url||"")}</div></td>
+      <td><span class="editable" data-lf="beds" data-ni="${ni}" data-li="${li}" data-ph="?">${l.beds??""}</span> bd / <span class="editable" data-lf="baths" data-ni="${ni}" data-li="${li}" data-ph="?">${l.baths??""}</span> ba</td>
+      <td class="lprice">$<span class="editable" data-lf="rent" data-ni="${ni}" data-li="${li}" data-ph="?">${l.rent??""}</span></td>
+      <td><span class="editable" data-lf="sqft" data-ni="${ni}" data-li="${li}" data-ph="?">${l.sqft??""}</span></td>
+      <td class="lpsf">${listPsf(l)}</td>
+      <td><span class="lrate editable" data-lf="rating" data-ni="${ni}" data-li="${li}" data-ph="–" style="background:${ratingColor(l.rating)}">${rt}</span><span class="lrate-max">/10</span></td>
+      <td><div class="gtxt editable" data-lf="notes" data-ni="${ni}" data-li="${li}" data-ph="notes…">${esc(l.notes||"")}</div></td>
+      <td><div class="gtxt editable" data-lf="tour_info" data-ni="${ni}" data-li="${li}" data-ph="tour info…">${esc(l.tour_info||"")}</div></td>
+      <td><button class="gdel" data-ni="${ni}" data-li="${li}" title="Remove listing">✕</button></td>
+    </tr>`;
+  }).join("");
+  const addRow=`<tr class="gaddrow"><td colspan="10"><div class="gaddwrap">
+      <span style="color:var(--muted);font-size:12px">➕ Add listing:</span>
+      <select class="gadd-district">${distOptions(data[0]&&data[0].name)}</select>
+      <input data-gaf="address" placeholder="Address">
+      <input data-gaf="url" placeholder="Listing URL (optional)">
+      <input data-gaf="img" placeholder="Image URL (optional)">
+      <input data-gaf="beds" class="sm" placeholder="Bd">
+      <input data-gaf="baths" class="sm" placeholder="Ba">
+      <input data-gaf="rent" class="sm" placeholder="$">
+      <input data-gaf="sqft" class="sm" placeholder="Sqft">
+      <input data-gaf="rating" class="sm" placeholder="/10">
+      <input data-gaf="notes" placeholder="Notes">
+      <input data-gaf="tour_info" placeholder="Tour info">
+      <button class="gaddbtn">+ Add</button>
+    </div></td></tr>`;
+  const emptyMsg = all.length?"":`<tr><td colspan="10" class="lempty">No listings yet — use the row below to add your first one.</td></tr>`;
+  body.innerHTML=emptyMsg+rows+addRow;
+  bindListingsGrid();
+}
 function listingsPanelHTML(row,ni){
   const rows=row.listings.map((l,li)=>{
     const thumb = l.img
@@ -624,14 +853,19 @@ function bindListings(){
         v=v.replace(/[^0-9.]/g,""); v=(v===""?null:+v);
         if(f==="rating"&&v!=null) v=Math.max(0,Math.min(10,v));
       } else if(f==="address" && v==="address…"){ v=""; }
-      data[ni].listings[li][f]=v; save(); render();
+      data[ni].listings[li][f]=v;
+      if(sb){ sbUpdate(data[ni].listings[li].id,{[f]:v}); render(); }
+      else { save(); render(); }
     });
     el.addEventListener("keydown",e=>{ if(e.key==="Enter"){e.preventDefault();el.blur();} });
   });
   document.querySelectorAll(".ldel").forEach(el=>{
     el.addEventListener("click",e=>{
       const ni=+el.dataset.ni, li=+el.dataset.li;
-      data[ni].listings.splice(li,1); save(); render();
+      const item=data[ni].listings[li];
+      data[ni].listings.splice(li,1);
+      if(sb){ sbDelete(item&&item.id); render(); }
+      else { save(); render(); }
     });
   });
   document.querySelectorAll(".laddbtn").forEach(btn=>{
@@ -641,7 +875,8 @@ function bindListings(){
       const num=k=>{ const v=get(k).replace(/[^0-9.]/g,""); return v===""?null:+v; };
       const l={img:get("img"),url:get("url"),address:get("address"),beds:num("beds"),baths:num("baths"),rent:num("rent"),sqft:num("sqft"),rating:num("rating")};
       if(!l.address&&!l.url&&l.rent==null){ alert("Add at least an address, a URL, or a price."); return; }
-      data[ni].listings.push(l); save(); render();
+      if(sb){ openListings.add(data[ni].name); sbInsert(Object.assign({district:data[ni].name}, l)); }
+      else { data[ni].listings.push(l); save(); render(); }
     });
   });
 }
@@ -716,6 +951,8 @@ function render(){
   });
   bindRow();
   bindListings();
+  const lv=document.getElementById("listingsView");
+  if(lv && lv.style.display!=="none") renderListingsView();
   save();
 }
 
@@ -980,18 +1217,24 @@ function initMap(){
 }
 function refreshMapIfVisible(){ if(mapReady && document.getElementById('mapView').style.display!=='none') drawMarkers(); }
 function showView(which){
-  const t=document.getElementById("tableView"), mv=document.getElementById("mapView");
-  const bt=document.getElementById("tabTable"), bm=document.getElementById("tabMap");
+  const t=document.getElementById("tableView"), mv=document.getElementById("mapView"), lv=document.getElementById("listingsView");
+  const bt=document.getElementById("tabTable"), bm=document.getElementById("tabMap"), bl=document.getElementById("tabListings");
+  t.style.display="none"; mv.style.display="none"; lv.style.display="none";
+  bt.classList.remove("active"); bm.classList.remove("active"); bl.classList.remove("active");
   if(which==="map"){
-    t.style.display="none"; mv.style.display="block"; bm.classList.add("active"); bt.classList.remove("active");
+    mv.style.display="block"; bm.classList.add("active");
     initMap();
     if(map){ setTimeout(()=>{ map.invalidateSize(); drawMarkers(); },40); }
+  } else if(which==="listings"){
+    lv.style.display="block"; bl.classList.add("active");
+    renderListingsView();
   } else {
-    mv.style.display="none"; t.style.display="block"; bt.classList.add("active"); bm.classList.remove("active");
+    t.style.display="block"; bt.classList.add("active");
   }
 }
 document.getElementById("tabTable").onclick=()=>showView("table");
 document.getElementById("tabMap").onclick=()=>showView("map");
+document.getElementById("tabListings").onclick=()=>showView("listings");
 document.querySelectorAll("[data-metric]").forEach(b=>b.onclick=()=>{
   mapMetric=b.dataset.metric;
   document.querySelectorAll("[data-metric]").forEach(x=>x.classList.toggle("active",x===b));
@@ -999,6 +1242,59 @@ document.querySelectorAll("[data-metric]").forEach(b=>b.onclick=()=>{
 });
 
 render();
+
+// ---- Shared data: one source of truth in the repo (data.json) ----
+// On load the page fetches data.json. It carries a "version" stamp; whenever you
+// publish a newer one (see the Publish button), every visitor adopts it on their
+// next load. Your friends are read-only viewers; their local tinkering is kept
+// only until you publish a new version. Falls back silently to the baked-in data
+// when opened as a local file:// or while offline.
+const VKEY="sf_data_version";
+function setSync(msg,color){ const el=document.getElementById("syncStatus"); if(el){ el.textContent=msg||""; el.style.color=color||"var(--muted)"; } }
+function adoptRemote(payload){
+  if(!payload || !Array.isArray(payload.neighborhoods)) return false;
+  data.length=0; payload.neighborhoods.forEach(n=>data.push(n));
+  data.forEach(r=>{ if(!Array.isArray(r.listings)) r.listings=[]; });
+  // backfill any neighborhood/field added since this published file was made
+  DEFAULTS.forEach((d,idx)=>{
+    const ex=data.find(x=>x.name===d.name);
+    if(!ex){ data.splice(Math.min(idx,data.length),0,JSON.parse(JSON.stringify(d))); }
+    else { if(ex.notables===undefined) ex.notables=d.notables; if(ex.vibe===undefined) ex.vibe=d.vibe; if(!Array.isArray(ex.listings)) ex.listings=[]; }
+  });
+  localStorage.setItem(KEY, JSON.stringify(data));
+  localStorage.setItem(VKEY, payload.version||"");
+  if(sb) fillListings(); // Supabase is the source of truth for listings, not the published file
+  return true;
+}
+async function syncFromRemote(){
+  try{
+    const res=await fetch("./data.json?cb="+Date.now(), {cache:"no-store"});
+    if(!res.ok) return;
+    const payload=await res.json();
+    const localV=localStorage.getItem(VKEY);
+    if(payload.version && payload.version!==localV){
+      if(adoptRemote(payload)){
+        render(); if(typeof refreshMapIfVisible==="function") refreshMapIfVisible();
+        const when=new Date(payload.version);
+        setSync("✓ Showing the latest shared data (updated "+(isNaN(when)?payload.version:when.toLocaleString())+").","var(--good)");
+      }
+    } else if(payload.version){
+      const when=new Date(payload.version);
+      setSync("Shared data · last updated "+(isNaN(when)?payload.version:when.toLocaleString())+".");
+    }
+  }catch(e){ /* offline or local file:// — keep cached/baked-in data */ }
+}
+syncFromRemote();
+startCollab();
+
+// ---- Publish: download a version-stamped data.json to commit to your repo ----
+document.getElementById("publishJson").onclick=()=>{
+  const version=new Date().toISOString();
+  dl("data.json", JSON.stringify({version, neighborhoods:data}, null, 2));
+  localStorage.setItem(KEY, JSON.stringify(data));
+  localStorage.setItem(VKEY, version);
+  setSync("⬆ data.json downloaded — commit it to your repo to push this update to everyone.","var(--accent)");
+};
 </script>
 </body>
 </html>

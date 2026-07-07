@@ -1,0 +1,338 @@
+{
+  "version": "2026-06-30T17:28:49.220Z",
+  "neighborhoods": [
+    {
+      "name": "North Beach / Telegraph Hill",
+      "vibe": "charming, and close to FiDi",
+      "notables": "Italian restaurants, cafés, nightlife, Washington Square",
+      "oneBR": "$3.6–4.3K / 600–750",
+      "twoBR": "$5.2–6.2K / 850–1,100",
+      "twoBRcorr": "was $4.6–5.3K — too low",
+      "commute": "Walk/bus 15–25m to FiDi",
+      "safety": "Above-avg property crime (car break-ins); no open-air drug issue",
+      "parks": "Strong: Washington Sq, Coit Tower steps",
+      "fit": "edge",
+      "r": {
+        "w": 5,
+        "c": 4,
+        "s": 4,
+        "v": 3
+      },
+      "note": "2BR now pricier than your draft; great character + parks.",
+      "listings": []
+    },
+    {
+      "name": "Mission Bay",
+      "vibe": "Clean, new, convenient, very close to work",
+      "notables": "UCSF, Chase Center, waterfront, new apartments",
+      "oneBR": "$4.8–5.3K / 700–800",
+      "twoBR": "$6.4–7K / 1,000–1,200",
+      "twoBRcorr": "was $5.7–6.3K — low",
+      "commute": "T-line/bike 15–25m; flat",
+      "safety": "Safest/newest; minor 2025 theft uptick",
+      "parks": "Modern waterfront: Mission Creek, China Basin",
+      "fit": "no",
+      "r": {
+        "w": 3,
+        "c": 5,
+        "s": 4,
+        "v": 1
+      },
+      "note": "2BR well over $5K. Modern but low character.",
+      "listings": [
+        {
+          "img": "",
+          "url": "https://hotpads.com/channel-mission-bay-san-francisco-ca-94158-skf95d/pad",
+          "address": "Channel Mission Bay (Unit 438), San Francisco, CA 94158",
+          "beds": 1,
+          "baths": 1,
+          "rent": 4814,
+          "sqft": 671,
+          "rating": null
+        }
+      ]
+    },
+    {
+      "name": "SoMa",
+      "vibe": "Best commute if office proximity matters more than neighborhood feel",
+      "notables": "Tech offices, warehouses, nightlife pockets, Folsom/Howard",
+      "oneBR": "$4.4–5.2K / 700–750",
+      "twoBR": "$5.3–6K / 850–1,050",
+      "twoBRcorr": "",
+      "commute": "Walk, shortest of all",
+      "safety": "Block-dependent; west/6th St serious drugs + theft",
+      "parks": "Limited: Yerba Buena, South Park",
+      "fit": "edge",
+      "r": {
+        "w": 4,
+        "c": 5,
+        "s": 2,
+        "v": 2
+      },
+      "note": "East/Rincon Hill blocks far safer than west/6th St — vet the exact street.",
+      "listings": [
+        {
+          "img": "",
+          "url": "https://www.zillow.com/homedetails/300-3rd-St-APT-1012-San-Francisco-CA-94107/15147833_zpid/",
+          "address": "300 3rd St APT 1012, San Francisco, CA 94107",
+          "beds": 1,
+          "baths": 1,
+          "rent": 4500,
+          "sqft": 946,
+          "rating": null
+        }
+      ]
+    },
+    {
+      "name": "FiDi / Embarcadero",
+      "vibe": "Best possible FiDi commute with waterfront access",
+      "notables": "Offices, waterfront, Salesforce Park",
+      "oneBR": "~$4–4.6K / 650–800",
+      "twoBR": "$5.5–7K / 1,000–1,300",
+      "twoBRcorr": "1BR: market-rate ~$4–4.6K",
+      "commute": "In-district walk; flat",
+      "safety": "Embarcadero fine; FiDi core dead off-hours, car break-ins",
+      "parks": "Waterfront promenade; little true green",
+      "fit": "edge",
+      "r": {
+        "w": 4,
+        "c": 5,
+        "s": 3,
+        "v": 2
+      },
+      "note": "Empties out nights/weekends. Embarcadero edge livelier.",
+      "listings": []
+    },
+    {
+      "name": "Potrero Hill",
+      "vibe": "Sunny, residential, close to east-side offices, more space than core downtown",
+      "notables": "18th St, views, hills, parks, quieter residential blocks",
+      "oneBR": "$4.1–4.4K / 650–800",
+      "twoBR": "$5.5–6.1K / 950–1,100",
+      "twoBRcorr": "verified 2BR range $4.8K–$10K",
+      "commute": "15–35m bus/bike/walk; 22nd St Caltrain",
+      "safety": "Generally safe; NW corner softer; some car break-ins",
+      "parks": "Strong & sunny: McKinley Sq, Potrero Rec, gardens",
+      "fit": "edge",
+      "r": {
+        "w": 4,
+        "c": 4,
+        "s": 4,
+        "v": 3
+      },
+      "note": "Your read holds — nice lifestyle, 2BR over $5K. Hills + Caltrain access.",
+      "listings": []
+    },
+    {
+      "name": "South Beach / China Basin",
+      "vibe": "Very convenient if you want waterfront, Caltrain/Oracle Park access, and short office commute",
+      "notables": "Oracle Park, waterfront, condos, Caltrain, Embarcadero edge",
+      "oneBR": "$3.9–4.3K / 750–800",
+      "twoBR": "$5.3–5.8K / 1,000–1,200",
+      "twoBRcorr": "1BR slightly lower than draft",
+      "commute": "Walk/bike 10–20m; flat",
+      "safety": "Good; cleaner than SoMa core",
+      "parks": "Strong: new China Basin Park, Embarcadero",
+      "fit": "edge",
+      "r": {
+        "w": 4,
+        "c": 5,
+        "s": 4,
+        "v": 2
+      },
+      "note": "Excellent commute; 2BR just above $5K at low end.",
+      "listings": []
+    },
+    {
+      "name": "Hayes Valley",
+      "vibe": "city energy, very walkable, gentrified, but could be close to less nice areas (Civic Center)",
+      "notables": "Restaurants, boutiques, arts",
+      "oneBR": "~$4K / 600–700",
+      "twoBR": "$4.5–6.6K / 900–1,100",
+      "twoBRcorr": "",
+      "commute": "Best transit: Metro/BART 15–20m",
+      "safety": "Core safe & lively; eastern edge near Civic Center/TL rough",
+      "parks": "Small: Patricia's Green (Panhandle short hop)",
+      "fit": "yes",
+      "r": {
+        "w": 5,
+        "c": 5,
+        "s": 3,
+        "v": 3
+      },
+      "note": "Your Civic Center caveat is correct. 2BR fits at lower end.",
+      "listings": []
+    },
+    {
+      "name": "Design District / Showplace Square",
+      "vibe": "Close to SoMa/Mission Bay, good for startup/office access, less purely residential",
+      "notables": "Showrooms, warehouses, CCA, AI/robotics offices, 16th/7th/Townsend area",
+      "oneBR": "$4.2–4.8K / 650–800",
+      "twoBR": "$5.5–6.2K / 900–1,100",
+      "twoBRcorr": "",
+      "commute": "5–20m walk/bike/bus to SoMa",
+      "safety": "Industrial/quiet; fewer eyes on street, some car/property theft",
+      "parks": "Limited green; Jackson Playground nearby",
+      "fit": "edge",
+      "r": {
+        "w": 4,
+        "c": 5,
+        "s": 3,
+        "v": 3
+      },
+      "note": "Convenient niche lifestyle (One Henry Adams). Walk Score 91; sparse at night.",
+      "listings": []
+    },
+    {
+      "name": "Japantown / Fillmore edge",
+      "vibe": "Central, walkable, distinctive, and close to multiple strong neighborhoods",
+      "notables": "Japan Center, Fillmore, ramen, cafés, music history",
+      "oneBR": "$3.5–4.2K / 500–700",
+      "twoBR": "$4.5–5.6K / 800–1,000",
+      "twoBRcorr": "",
+      "commute": "38-Geary bus 20–25m",
+      "safety": "Core safe; Fillmore/W. Addition edges need caution",
+      "parks": "Limited; Lafayette/Alta Plaza walkable",
+      "fit": "yes",
+      "r": {
+        "w": 4,
+        "c": 4,
+        "s": 3,
+        "v": 4
+      },
+      "note": "Good value + culture; block-by-block safety variance.",
+      "listings": [
+        {
+          "img": "",
+          "url": "https://www.zillow.com/apartments/san-francisco-ca/the-fillmore-center/5XjVzy/",
+          "address": "The Fillmore Center, Unit M20306, 1475 Fillmore St, San Francisco, CA 94115",
+          "beds": 1,
+          "baths": 1,
+          "rent": 3939,
+          "sqft": 785,
+          "rating": null
+        }
+      ]
+    },
+    {
+      "name": "NOPA",
+      "vibe": "Great neighborhood density with parks, restaurants, and central access",
+      "notables": "Divisadero, Alamo Square, Panhandle, restaurants",
+      "oneBR": "~$4K / 550–750",
+      "twoBR": "$3.9–5.5K / 700–1,000",
+      "twoBRcorr": "",
+      "commute": "Weak transit; great bike (the Wiggle)",
+      "safety": "Good, family-friendly; softer eastern edge",
+      "parks": "BEST: Panhandle + Golden Gate Park, Alamo Sq",
+      "fit": "yes",
+      "r": {
+        "w": 4,
+        "c": 3,
+        "s": 5,
+        "v": 4
+      },
+      "note": "You undersold the parks — best green of the list. Bike commute.",
+      "listings": []
+    },
+    {
+      "name": "Noe Valley",
+      "vibe": "Sunny, polished, walkable, calmer than Mission/Castro",
+      "notables": "24th St, cafés, families, sunny village feel",
+      "oneBR": "$3.7–5.1K / 500–700",
+      "twoBR": "$4.7–6.9K / 800–1,000",
+      "twoBRcorr": "",
+      "commute": "Longest: J-Church 25–30m (unreliable)",
+      "safety": "Safest-feeling; not near any rough area",
+      "parks": "Good + sunny: Douglass, Glen Canyon",
+      "fit": "edge",
+      "r": {
+        "w": 4,
+        "c": 3,
+        "s": 5,
+        "v": 3
+      },
+      "note": "Don't expect <30m commute. Calm, low city-energy.",
+      "listings": []
+    },
+    {
+      "name": "Dogpatch",
+      "vibe": "newer housing, waterfront access, and east-side commute",
+      "notables": "3rd St, waterfront, warehouse/design vibe",
+      "oneBR": "~$3.8K / 650–800",
+      "twoBR": "$5–6.5K / 850–1,050",
+      "twoBRcorr": "",
+      "commute": "T-line/bike 15–30m; flat",
+      "safety": "Moderate; traffic > crime, some car break-ins",
+      "parks": "Strong: Crane Cove, Esprit, waterfront",
+      "fit": "edge",
+      "r": {
+        "w": 4,
+        "c": 4,
+        "s": 4,
+        "v": 3
+      },
+      "note": "Cool & walkable; 2BR low end only at $5K.",
+      "listings": []
+    },
+    {
+      "name": "Pacific Heights",
+      "vibe": "Beautiful, polished, very walkable, classic SF feel",
+      "notables": "Fillmore, Alta Plaza, mansions, polished classic SF",
+      "oneBR": "$3.3–4K / 650–800",
+      "twoBR": "$4.5–6K / 900–1,050",
+      "twoBRcorr": "1BR lower than draft",
+      "commute": "1-Cal/2-Sutter bus 20–35m; hilly",
+      "safety": "Among safest in SF",
+      "parks": "Excellent: Lafayette, Alta Plaza, Presidio",
+      "fit": "yes",
+      "r": {
+        "w": 4,
+        "c": 3,
+        "s": 5,
+        "v": 3
+      },
+      "note": "Not walkable to office daily (hills). 2BR fits at lower end.",
+      "listings": []
+    },
+    {
+      "name": "Lower Nob Hill / Polk Gulch",
+      "vibe": "Dense, walkable, cheaper than Russian/Nob Hill proper, but a little more urban vibes",
+      "notables": "Polk St bars/restaurants, central access",
+      "oneBR": "$2.8–4.1K / 450–650",
+      "twoBR": "$3.4–5.1K / 750–1,000",
+      "twoBRcorr": "",
+      "commute": "Walkable 15–30m — better than rank implies",
+      "safety": "Borders Tenderloin; N of Geary fine, S gritty",
+      "parks": "Limited: Huntington Park",
+      "fit": "yes",
+      "r": {
+        "w": 5,
+        "c": 5,
+        "s": 3,
+        "v": 5
+      },
+      "note": "Best value + genuinely walkable. Which side of Geary matters a lot.",
+      "listings": []
+    },
+    {
+      "name": "Mission / Mission Dolores",
+      "vibe": "urban energy, food, nightlife, transit, and commute",
+      "notables": "Valencia St, Dolores Park, restaurants, bars, sunny weather",
+      "oneBR": "$3.4–4K / 550–750",
+      "twoBR": "$4–6K / 850–1,100",
+      "twoBRcorr": "",
+      "commute": "BART = fastest, ~6–10m ride",
+      "safety": "16th St BART hotspot; Mission Dolores side quiet",
+      "parks": "Dolores Park; sunniest in SF",
+      "fit": "yes",
+      "r": {
+        "w": 5,
+        "c": 5,
+        "s": 4,
+        "v": 5
+      },
+      "note": "Best value + fastest commute via BART. Dolores side avoids the 16th St scene.",
+      "listings": []
+    }
+  ]
+}
