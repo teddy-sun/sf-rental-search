@@ -171,6 +171,22 @@
   .gaddrow input,.gaddrow select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:7px;padding:6px 9px;font-size:12px}
   .gaddrow input.sm{width:62px}
   .gaddbtn{background:var(--accent);color:#0b0d12;border:none;border-radius:7px;padding:7px 12px;font-weight:700;cursor:pointer;font-size:12px}
+  /* Compact + grouped Listings grid */
+  table.alltbl td{padding:5px 10px}
+  .alltbl .lthumb{width:46px;height:34px;border-radius:5px}
+  .alltbl .lthumb.ph{font-size:8px}
+  .alltbl .photocell{display:flex;gap:8px;align-items:center}
+  .alltbl .addrwrap{min-width:0;display:flex;flex-direction:column;gap:1px}
+  .alltbl .laddr{max-width:210px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:0;line-height:1.3}
+  .alltbl .urlicon{color:var(--accent);font-size:11px;text-decoration:none}
+  .alltbl .lurl.editable{display:block;font-size:10px;color:var(--accent);max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;word-break:normal;margin-top:2px}
+  .alltbl .ldist-sel{max-width:150px}
+  .alltbl .gtxt{min-width:90px;max-width:180px}
+  /* District group header band */
+  .alltbl tr.grp td{background:#161d2b;cursor:pointer;font-weight:700;color:var(--text);padding:7px 11px;border-top:1px solid var(--line);user-select:none}
+  .alltbl tr.grp:hover td{background:#1b2333}
+  .alltbl tr.grp .caret{display:inline-block;width:14px;color:var(--muted)}
+  .alltbl tr.grp .cnt{color:var(--muted);font-weight:500;font-size:11px;margin-left:8px}
   .leaflet-tooltip.routelbl{background:rgba(15,17,21,.9);border:none;color:#fff;font-weight:700;font-size:11px;padding:2px 7px;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.4)}
   .leaflet-tooltip.routelbl:before{display:none}
   .mpop-commute{margin-top:8px;border-top:1px solid #ddd;padding-top:7px;font-size:12px}
@@ -448,6 +464,7 @@ DEFAULTS.forEach((d,idx)=>{
 data.forEach(r=>{ if(!Array.isArray(r.listings)) r.listings=[]; });
 // Track which districts have their listings panel expanded (persists across re-renders).
 const openListings = new Set();
+const collapsedDistricts = new Set(); // Listings tab: which district groups are collapsed
 
 // ---- Seeded listings: baked into this file, merged once into your saved data ----
 // Each entry is applied a single time (tracked in localStorage), so it survives your
@@ -739,45 +756,57 @@ function bindListingsGrid(){
   body.querySelectorAll(".gdel").forEach(b=>{
     b.addEventListener("click",()=>deleteGridListing(+b.dataset.ni,+b.dataset.li));
   });
+  body.querySelectorAll("tr.grp").forEach(tr=>{
+    tr.addEventListener("click",()=>{
+      const name=tr.dataset.dist;
+      if(collapsedDistricts.has(name)) collapsedDistricts.delete(name); else collapsedDistricts.add(name);
+      renderListingsView();
+    });
+  });
   const af=body.querySelector(".gaddrow");
   if(af){ const btn=af.querySelector(".gaddbtn"); if(btn) btn.addEventListener("click",()=>addGridListing(af)); }
+}
+function listingRowHTML(l,ni,li,distOptions){
+  const thumb = l.img
+    ? `<img class="lthumb" src="${esc(l.img)}" alt="" onerror="this.outerHTML='<div class=\\'lthumb ph\\'>broken</div>'">`
+    : `<div class="lthumb ph">no img</div>`;
+  const photo = l.url ? `<a href="${esc(l.url)}" target="_blank" rel="noopener">${thumb}</a>` : thumb;
+  const rt = (l.rating==null||l.rating==="")?"":l.rating;
+  return `<tr>
+    <td><select class="ldist-sel" data-ni="${ni}" data-li="${li}">${distOptions(l._district)}</select></td>
+    <td class="lphoto"><div class="photocell">${photo}
+      <div class="addrwrap">
+        <div class="laddr editable" data-lf="address" data-ni="${ni}" data-li="${li}" data-ph="address…">${esc(l.address||"")}</div>
+        <div class="lurl editable" data-lf="url" data-ni="${ni}" data-li="${li}" data-ph="listing URL…">${esc(l.url||"")}</div>
+      </div></div></td>
+    <td><span class="editable" data-lf="beds" data-ni="${ni}" data-li="${li}" data-ph="?">${l.beds??""}</span> bd / <span class="editable" data-lf="baths" data-ni="${ni}" data-li="${li}" data-ph="?">${l.baths??""}</span> ba</td>
+    <td class="lprice">$<span class="editable" data-lf="rent" data-ni="${ni}" data-li="${li}" data-ph="?">${l.rent??""}</span></td>
+    <td><span class="editable" data-lf="sqft" data-ni="${ni}" data-li="${li}" data-ph="?">${l.sqft??""}</span></td>
+    <td class="lpsf">${listPsf(l)}</td>
+    <td><span class="lrate editable" data-lf="rating" data-ni="${ni}" data-li="${li}" data-ph="–" style="background:${ratingColor(l.rating)}">${rt}</span><span class="lrate-max">/10</span></td>
+    <td><div class="gtxt editable" data-lf="notes" data-ni="${ni}" data-li="${li}" data-ph="notes…">${esc(l.notes||"")}</div></td>
+    <td><div class="gtxt editable" data-lf="tour_info" data-ni="${ni}" data-li="${li}" data-ph="tour info…">${esc(l.tour_info||"")}</div></td>
+    <td><button class="gdel" data-ni="${ni}" data-li="${li}" title="Remove listing">✕</button></td>
+  </tr>`;
 }
 function renderListingsView(){
   const body=document.getElementById("allListingsBody");
   if(!body) return;
-  const all=[];
-  data.forEach((d,ni)=>{ (d.listings||[]).forEach((l,li)=>all.push(Object.assign({_ni:ni,_li:li,_district:d.name},l))); });
-  // Group by district (in ranking order), then cheapest $/sqft first within each district.
-  all.sort((a,b)=>{
-    if(a._ni!==b._ni) return a._ni-b._ni;
-    const pa=(a.rent&&a.sqft)?a.rent/a.sqft:Infinity, pb=(b.rent&&b.sqft)?b.rent/b.sqft:Infinity;
-    return pa-pb;
-  });
+  const total=data.reduce((a,d)=>a+(d.listings?d.listings.length:0),0);
+  const withListings=data.filter(d=>d.listings&&d.listings.length).length;
   const sub=document.getElementById("allListingsSub");
-  if(sub) sub.textContent=`${all.length} listing${all.length===1?"":"s"} across ${new Set(all.map(l=>l._district)).size} district${new Set(all.map(l=>l._district)).size===1?"":"s"} — editable: click any cell to change it, use the bottom row to add one, or ✕ to remove.`;
+  if(sub) sub.textContent=`${total} listing${total===1?"":"s"} across ${withListings} district${withListings===1?"":"s"} — click a district header to collapse it; click any cell to edit; use the bottom row to add.`;
   const distOptions=(sel)=>data.map(d=>`<option${d.name===sel?" selected":""}>${esc(d.name)}</option>`).join("");
-  const rows=all.map(l=>{
-    const ni=l._ni, li=l._li;
-    const thumb = l.img
-      ? `<img class="lthumb" src="${esc(l.img)}" alt="" onerror="this.outerHTML='<div class=\\'lthumb ph\\'>image link<br>broken</div>'">`
-      : `<div class="lthumb ph">no image</div>`;
-    const photo = l.url ? `<a href="${esc(l.url)}" target="_blank" rel="noopener">${thumb}</a>` : thumb;
-    const rt = (l.rating==null||l.rating==="")?"":l.rating;
-    return `<tr>
-      <td><select class="ldist-sel" data-ni="${ni}" data-li="${li}">${distOptions(l._district)}</select></td>
-      <td class="lphoto">${photo}
-        <div class="laddr editable" data-lf="address" data-ni="${ni}" data-li="${li}" data-ph="address…">${esc(l.address||"")}</div>
-        <div class="lurl editable" data-lf="url" data-ni="${ni}" data-li="${li}" data-ph="listing URL…">${esc(l.url||"")}</div></td>
-      <td><span class="editable" data-lf="beds" data-ni="${ni}" data-li="${li}" data-ph="?">${l.beds??""}</span> bd / <span class="editable" data-lf="baths" data-ni="${ni}" data-li="${li}" data-ph="?">${l.baths??""}</span> ba</td>
-      <td class="lprice">$<span class="editable" data-lf="rent" data-ni="${ni}" data-li="${li}" data-ph="?">${l.rent??""}</span></td>
-      <td><span class="editable" data-lf="sqft" data-ni="${ni}" data-li="${li}" data-ph="?">${l.sqft??""}</span></td>
-      <td class="lpsf">${listPsf(l)}</td>
-      <td><span class="lrate editable" data-lf="rating" data-ni="${ni}" data-li="${li}" data-ph="–" style="background:${ratingColor(l.rating)}">${rt}</span><span class="lrate-max">/10</span></td>
-      <td><div class="gtxt editable" data-lf="notes" data-ni="${ni}" data-li="${li}" data-ph="notes…">${esc(l.notes||"")}</div></td>
-      <td><div class="gtxt editable" data-lf="tour_info" data-ni="${ni}" data-li="${li}" data-ph="tour info…">${esc(l.tour_info||"")}</div></td>
-      <td><button class="gdel" data-ni="${ni}" data-li="${li}" title="Remove listing">✕</button></td>
-    </tr>`;
-  }).join("");
+  // Build grouped rows: a header band per district (ranking order), cheapest $/sqft first within.
+  let rows="";
+  data.forEach((d,ni)=>{
+    const items=(d.listings||[]).map((l,li)=>Object.assign({_ni:ni,_li:li,_district:d.name},l));
+    if(!items.length) return;
+    items.sort((a,b)=>{ const pa=(a.rent&&a.sqft)?a.rent/a.sqft:Infinity, pb=(b.rent&&b.sqft)?b.rent/b.sqft:Infinity; return pa-pb; });
+    const collapsed=collapsedDistricts.has(d.name);
+    rows+=`<tr class="grp" data-dist="${esc(d.name)}"><td colspan="10"><span class="caret">${collapsed?"▸":"▾"}</span>${esc(d.name)}<span class="cnt">${items.length} listing${items.length===1?"":"s"}</span></td></tr>`;
+    if(!collapsed) rows+=items.map(l=>listingRowHTML(l,l._ni,l._li,distOptions)).join("");
+  });
   const addRow=`<tr class="gaddrow"><td colspan="10"><div class="gaddwrap">
       <span style="color:var(--muted);font-size:12px">➕ Add listing:</span>
       <select class="gadd-district">${distOptions(data[0]&&data[0].name)}</select>
@@ -793,7 +822,7 @@ function renderListingsView(){
       <input data-gaf="tour_info" placeholder="Tour info">
       <button class="gaddbtn">+ Add</button>
     </div></td></tr>`;
-  const emptyMsg = all.length?"":`<tr><td colspan="10" class="lempty">No listings yet — use the row below to add your first one.</td></tr>`;
+  const emptyMsg = total?"":`<tr><td colspan="10" class="lempty">No listings yet — use the row below to add your first one.</td></tr>`;
   body.innerHTML=emptyMsg+rows+addRow;
   bindListingsGrid();
 }
