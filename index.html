@@ -166,10 +166,10 @@
   .alltbl .lurl.editable{display:block;font-size:10px;color:var(--accent);max-width:200px;word-break:break-all;margin-top:3px}
   .alltbl .gdel{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:6px;cursor:pointer;padding:2px 8px;font-size:12px}
   .alltbl .gdel:hover{color:var(--bad);border-color:var(--bad)}
-  .gaddrow td{background:#0f1420;padding:10px 11px}
-  .gaddrow .gaddwrap{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-  .gaddrow input,.gaddrow select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:7px;padding:6px 9px;font-size:12px}
-  .gaddrow input.sm{width:62px}
+  .addbarwrap{margin-top:12px;padding:10px 11px;background:#0f1420;border:1px solid var(--line);border-radius:10px}
+  .gaddwrap{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .addbarwrap input,.addbarwrap select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:7px;padding:6px 9px;font-size:12px}
+  .addbarwrap input.sm{width:62px}
   .gaddbtn{background:var(--accent);color:#0b0d12;border:none;border-radius:7px;padding:7px 12px;font-weight:700;cursor:pointer;font-size:12px}
   /* Compact + grouped Listings grid */
   table.alltbl td{padding:5px 10px}
@@ -282,6 +282,7 @@
         <tbody id="allListingsBody"></tbody>
       </table>
     </div>
+    <div id="addListingBar" class="addbarwrap"></div>
   </div>
 
   <div class="panel" style="margin-top:18px">
@@ -664,9 +665,18 @@ function fillListings(){
   data.forEach(d=>{ d.listings=[]; });
   sbRows.forEach(r=>{ const di=findDistrict(r.district); if(di>=0){ data[di].listings.push(rowToListing(r)); openListings.add(data[di].name); } });
 }
-async function sbLoad(){
+function isEditingListings(){
+  const ae=document.activeElement;
+  return !!(ae && (ae.isContentEditable || ae.tagName==="INPUT" || ae.tagName==="SELECT") && ae.closest && ae.closest("#listingsView"));
+}
+async function sbLoad(opts){
   if(!sb) return;
   sbRows=await sbFetch();
+  // Don't rebuild the grid out from under someone who is mid-edit or mid-add.
+  if(!(opts&&opts.force) && isEditingListings()){
+    setCollab(`● Live shared table — ${sbRows.length} listing${sbRows.length===1?"":"s"} · paused refresh while you're editing…`,"var(--good)");
+    return;
+  }
   fillListings();
   render();
   setCollab(`● Live shared table — ${sbRows.length} listing${sbRows.length===1?"":"s"}. Anyone with the link can add or edit; others' changes appear within ~12s.`,"var(--good)");
@@ -675,7 +685,7 @@ async function sbInsert(obj){
   if(!sb) return;
   const {error}=await sb.from("listings").insert(obj);
   if(error){ alert("Couldn't add to the shared table: "+error.message); return; }
-  await sbLoad();
+  await sbLoad({force:true});
 }
 async function sbUpdate(id,patch){
   if(!sb||!id) return;
@@ -738,6 +748,7 @@ function addGridListing(form){
   const nj=findDistrict(districtName);
   if(sb){ if(nj>=0) openListings.add(data[nj].name); sbInsert(Object.assign({district:districtName}, l)); }
   else { if(nj<0){ alert("Pick a district."); return; } data[nj].listings.push(l); save(); render(); }
+  clearAddBar();
 }
 function bindListingsGrid(){
   const body=document.getElementById("allListingsBody");
@@ -763,8 +774,6 @@ function bindListingsGrid(){
       renderListingsView();
     });
   });
-  const af=body.querySelector(".gaddrow");
-  if(af){ const btn=af.querySelector(".gaddbtn"); if(btn) btn.addEventListener("click",()=>addGridListing(af)); }
 }
 function listingRowHTML(l,ni,li,distOptions){
   const thumb = l.img
@@ -807,7 +816,19 @@ function renderListingsView(){
     rows+=`<tr class="grp" data-dist="${esc(d.name)}"><td colspan="10"><span class="caret">${collapsed?"▸":"▾"}</span>${esc(d.name)}<span class="cnt">${items.length} listing${items.length===1?"":"s"}</span></td></tr>`;
     if(!collapsed) rows+=items.map(l=>listingRowHTML(l,l._ni,l._li,distOptions)).join("");
   });
-  const addRow=`<tr class="gaddrow"><td colspan="10"><div class="gaddwrap">
+  const emptyMsg = total?"":`<tr><td colspan="10" class="lempty">No listings yet — use the “Add listing” bar below to add your first one.</td></tr>`;
+  body.innerHTML=emptyMsg+rows;
+  bindListingsGrid();
+  buildAddBar();
+}
+// The add form lives OUTSIDE the re-rendered table so in-progress typing is never wiped
+// by a background refresh. Built once; only its district dropdown is refreshed afterward.
+function buildAddBar(){
+  const bar=document.getElementById("addListingBar");
+  if(!bar) return;
+  const distOptions=(sel)=>data.map(d=>`<option${d.name===sel?" selected":""}>${esc(d.name)}</option>`).join("");
+  if(!bar.dataset.built){
+    bar.innerHTML=`<div class="gaddwrap">
       <span style="color:var(--muted);font-size:12px">➕ Add listing:</span>
       <select class="gadd-district">${distOptions(data[0]&&data[0].name)}</select>
       <input data-gaf="address" placeholder="Address">
@@ -821,10 +842,17 @@ function renderListingsView(){
       <input data-gaf="notes" placeholder="Notes">
       <input data-gaf="tour_info" placeholder="Tour info">
       <button class="gaddbtn">+ Add</button>
-    </div></td></tr>`;
-  const emptyMsg = total?"":`<tr><td colspan="10" class="lempty">No listings yet — use the row below to add your first one.</td></tr>`;
-  body.innerHTML=emptyMsg+rows+addRow;
-  bindListingsGrid();
+    </div>`;
+    bar.dataset.built="1";
+    bar.querySelector(".gaddbtn").addEventListener("click",()=>addGridListing(bar));
+  } else {
+    const sel=bar.querySelector(".gadd-district");
+    if(sel && document.activeElement!==sel){ const cur=sel.value; sel.innerHTML=distOptions(cur); }
+  }
+}
+function clearAddBar(){
+  const bar=document.getElementById("addListingBar");
+  if(bar) bar.querySelectorAll("[data-gaf]").forEach(i=>i.value="");
 }
 function listingsPanelHTML(row,ni){
   const rows=row.listings.map((l,li)=>{
